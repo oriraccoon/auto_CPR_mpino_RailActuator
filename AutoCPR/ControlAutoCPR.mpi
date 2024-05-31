@@ -1,19 +1,25 @@
 /*
 
-2024년 5월 30일자 수정본
+      2024년 5월 30일자 수정본
 
-할일
-모터 구동						O
-버튼 동작						O
-압력 센서 받기					X
-심박 센서 받기					X
-색인지 센서 빋기				X
-색인지 위치까지 모터 구동		X
-압력 센서 인식 시 모터 정지		X
-정지 버튼 초기 위치로			X
+-----------------할일---------------------
+      모터 구동						          O
+      버튼 동작						          O
+      압력 센서 받기					      X
+      심박 센서 받기					      X
+      색인지 센서 빋기				       X
+      색인지 위치까지 모터 구동		    X
+      압력 센서 인식 시 모터 정지		  X
+      정지 버튼 초기 위치로			      X
 
 
-* 빠진 거 있으면 추가 바람 *
+      * 빠진 거 있으면 추가 바람 *
+
+
+                    ※주의사항※
+      모터가 끝에 닿으면 굉음나고 고장날까봐 무서우니 조심하세요
+
+
 
 */
 
@@ -31,6 +37,7 @@ int baudrate = 115200;
 unsigned long int i;
 volatile bool sleep = false;
 volatile bool start = false;
+volatile bool stop = true;
 volatile bool FSR = false;
 void setup() {
 	Wire.begin();
@@ -42,15 +49,16 @@ void setup() {
 	pinMode( STOPbtn, INPUT_PULLUP );
 	pinMode( SLEEPbtn, INPUT_PULLUP );
 	delay( 0 );
-	attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING ); 	// 정지버튼 눌렸을 때
-	attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );	// 대기버튼 눌렸을 때
+	attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING ); 	// 정지버튼 눌렸을 때 _STOP함수 실행
+	attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );	// 대기버튼 눌렸을 때 _SLEEP함수 실행
 }
 
 // 정지버튼 동작코드
 void _STOP()
 {
 	start = false;
-	sleep = true;
+  stop = true;
+  sleep = false;
 	Serial.println( "btn detected" );
 }
 
@@ -70,22 +78,25 @@ void _SLEEP()
 
 void loop()
 {
+  // Slave에서 I2C통신으로 받을 포멧 설정 (Slave_num, len_byte)
 	Wire.requestFrom( 8, 3 );
-	
+	// 데이터 받았으면
 	if ( Wire.available() == 3 )
 	{
+    // 받은 값 입력
 		int btn_status = Wire.read();
 		if ( btn_status == 1 )
 		{
 			start = true;
+      stop = false;
 		}
 	}
-	while ( start == true )
+	while ( start == true && stop == false)
 	{
 		//모터 반대 방향
 		digitalWrite( Y_DIR, LOW );
 		digitalWrite( X_DIR, HIGH );
-		for ( i = 0; i < ( microStep * rotation ); i++ )
+		for ( i = 0; i < ( microStep * rotation ); i++ ) // microStep * rotation 값이 커질수록 많이 이동하는데 이상하게 일정 값이 넘으면 for문에서 못 벗어남
 		{
 			digitalWrite( Y_PUL, HIGH );
 			delayMicroseconds( 10 ); //속도
