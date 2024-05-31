@@ -1,0 +1,231 @@
+{
+  "$type": "MpInoStudio.Datas.MPDocument, MpInoStudio",
+  "Area": {
+    "$type": "MpInoStudio.Datas.AreaInfo, MpInoStudio",
+    "PCount": 128,
+    "MCount": 1024,
+    "TCount": 128,
+    "CCount": 100,
+    "DCount": 100,
+    "RCount": 50
+  },
+  "Codes": {
+    "$type": "System.Collections.Generic.List`1[[MpInoStudio.Datas.ArduinoCode, MpInoStudio]], mscorlib",
+    "$values": [
+      {
+        "$type": "MpInoStudio.Datas.ArduinoCode, MpInoStudio",
+        "Name": "hna",
+        "Code": "/*\r\n\r\n2024년 5월 30일자 수정본\r\n\r\n할일\r\n모터 구동\t\t\t\t\t\tO\r\n버튼 동작\t\t\t\t\t\tO\r\n압력 센서 받기\t\t\t\t\tX\r\n심박 센서 받기\t\t\t\t\tX\r\n색인지 센서 빋기\t\t\t\tX\r\n색인지 위치까지 모터 구동\t\tX\r\n압력 센서 인식 시 모터 정지\t\tX\r\n정지 버튼 초기 위치로\t\t\tX\r\n\r\n\r\n* 빠진 거 있으면 추가 바람 *\r\n\r\n*/\r\n\r\n#include <Wire.h>\r\n\r\nint Y_PUL = 7;\r\nint Y_DIR = 8;\r\nint X_PUL = 5;\r\nint X_DIR = 6;\r\nint STOPbtn = 3;\r\nint SLEEPbtn = 2;\r\nint microStep = 8; //스텝 and 펄스\r\nint rotation = 12000; //회전수\r\nint baudrate = 115200;\r\nunsigned long int i;\r\nvolatile bool sleep = false;\r\nvolatile bool start = false;\r\nvolatile bool FSR = false;\r\nvoid setup() {\r\n\tWire.begin();\r\n\tSerial.begin( baudrate );\r\n\tpinMode( Y_PUL, OUTPUT );\r\n\tpinMode( Y_DIR, OUTPUT );\r\n\tpinMode( X_PUL, OUTPUT );\r\n\tpinMode( X_DIR, OUTPUT );\r\n\tpinMode( STOPbtn, INPUT_PULLUP );\r\n\tpinMode( SLEEPbtn, INPUT_PULLUP );\r\n\tdelay( 0 );\r\n\tattachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING ); \t// 정지버튼 눌렸을 때\r\n\tattachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );\t// 대기버튼 눌렸을 때\r\n}\r\n\r\n// 정지버튼 동작코드\r\nvoid _STOP()\r\n{\r\n\tstart = false;\r\n\tsleep = true;\r\n\tSerial.println( \"btn detected\" );\r\n}\r\n\r\n// 대기버튼 동작코드\r\nvoid _SLEEP()\r\n{\r\n\tsleep = !sleep;\r\n\tstart = false;\r\n\tif ( sleep == false)\r\n\t{\r\n\t\tstart = true;\r\n\t\t\r\n\t}\r\n\t\r\n}\r\n\t\r\n\r\nvoid loop()\r\n{\r\n\tWire.requestFrom( 8, 3 );\r\n\t\r\n\tif ( Wire.available() == 3 )\r\n\t{\r\n\t\tint btn_status = Wire.read();\r\n\t\tif ( btn_status == 1 )\r\n\t\t{\r\n\t\t\tstart = true;\r\n\t\t}\r\n\t}\r\n\twhile ( start == true )\r\n\t{\r\n\t\t//모터 반대 방향\r\n\t\tdigitalWrite( Y_DIR, LOW );\r\n\t\tdigitalWrite( X_DIR, HIGH );\r\n\t\tfor ( i = 0; i < ( microStep * rotation ); i++ )\r\n\t\t{\r\n\t\t\tdigitalWrite( Y_PUL, HIGH );\r\n\t\t\tdelayMicroseconds( 10 ); //속도\r\n\t\t\tdigitalWrite( Y_PUL, LOW );\r\n\t\t\tdelayMicroseconds( 10 );\r\n\t\t\tdigitalWrite( X_PUL, HIGH );\r\n\t\t\tdelayMicroseconds( 10 );\r\n\t\t\tdigitalWrite( X_PUL, LOW );\r\n\t\t\tdelayMicroseconds( 10 );\r\n\t\t\tattachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING );\r\n\t\t\tattachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );\r\n\t\t}\r\n\t\tdelay( 500 );\r\n\r\n\t\t//모터 방향\r\n\t\tdigitalWrite( Y_DIR, HIGH );\r\n\t\tdigitalWrite( X_DIR, LOW );\r\n\t\tfor ( i = 0; i < ( microStep * rotation ); i++ )\r\n\t\t{\r\n\t\t\tdigitalWrite( Y_PUL, HIGH );\r\n\t\t\tdelayMicroseconds( 1 );\r\n\t\t\tdigitalWrite( Y_PUL, LOW );\r\n\t\t\tdelayMicroseconds( 1 );\r\n\t\t\tdigitalWrite( X_PUL, HIGH );\r\n\t\t\tdelayMicroseconds( 10 );\r\n\t\t\tdigitalWrite( X_PUL, LOW );\r\n\t\t\tdelayMicroseconds( 10 );\r\n\t\t\tattachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING );\r\n\t\t\tattachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );\r\n\t\t}\r\n\t\tdelay( 500 );\r\n\t}\r\n}"
+      }
+    ]
+  },
+  "Ladders": {
+    "$type": "System.Collections.Generic.List`1[[MpInoStudio.Ladder.LadderItem, MpInoStudio]], mscorlib",
+    "$values": []
+  },
+  "ProjectName": "hna",
+  "LastPort": "COM6",
+  "LastLadderPort": "COM6",
+  "LastDevice": {
+    "$type": "MpInoStudio.Datas.DeviceInfo, MpInoStudio",
+    "DeviceName": "MPINO-8A8R",
+    "Company": "MPINO",
+    "CoreID": "arduino:avr@1.8.4",
+    "BaseBoardFQBN": "arduino:avr:mega",
+    "HeaderFile": "MPINO-8A8R.h",
+    "Pins": {
+      "$type": "System.Collections.Generic.List`1[[MpInoStudio.Datas.Pin, MpInoStudio]], mscorlib",
+      "$values": [
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "I(22)",
+          "PinNumber": 22,
+          "PinType": 1
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "I(23)",
+          "PinNumber": 23,
+          "PinType": 1
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "I(24)",
+          "PinNumber": 24,
+          "PinType": 1
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "I(25)",
+          "PinNumber": 25,
+          "PinType": 1
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "I(26)",
+          "PinNumber": 26,
+          "PinType": 1
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "I(27)",
+          "PinNumber": 27,
+          "PinType": 1
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "I(28)",
+          "PinNumber": 28,
+          "PinType": 1
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "I(29)",
+          "PinNumber": 29,
+          "PinType": 1
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "R(62)",
+          "PinNumber": 62,
+          "PinType": 2
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "R(63)",
+          "PinNumber": 63,
+          "PinType": 2
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "R(64)",
+          "PinNumber": 64,
+          "PinType": 2
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "R(65)",
+          "PinNumber": 65,
+          "PinType": 2
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "R(66)",
+          "PinNumber": 66,
+          "PinType": 2
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "R(67)",
+          "PinNumber": 67,
+          "PinType": 2
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "R(68)",
+          "PinNumber": 68,
+          "PinType": 2
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "R(69)",
+          "PinNumber": 69,
+          "PinType": 2
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "A(0)",
+          "PinNumber": 0,
+          "PinType": 4
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "A(1)",
+          "PinNumber": 1,
+          "PinType": 4
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "A(2)",
+          "PinNumber": 2,
+          "PinType": 4
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "A(3)",
+          "PinNumber": 3,
+          "PinType": 4
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "PWM5",
+          "PinNumber": 5,
+          "PinType": 8
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "PWM2",
+          "PinNumber": 2,
+          "PinType": 8
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "PWM3",
+          "PinNumber": 3,
+          "PinType": 8
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "PWM6",
+          "PinNumber": 6,
+          "PinType": 8
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "PWM7",
+          "PinNumber": 7,
+          "PinType": 8
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "PWM8",
+          "PinNumber": 8,
+          "PinType": 8
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "TCNT1",
+          "PinNumber": 1,
+          "PinType": 16
+        },
+        {
+          "$type": "MpInoStudio.Datas.Pin, MpInoStudio",
+          "Name": "TCNT5",
+          "PinNumber": 5,
+          "PinType": 16
+        }
+      ]
+    }
+  },
+  "Symbols": {
+    "$type": "System.Collections.Generic.List`1[[MpInoStudio.Datas.SymbolInfo, MpInoStudio]], mscorlib",
+    "$values": []
+  },
+  "Hardwares": {
+    "$type": "System.Collections.Generic.List`1[[MpInoStudio.Datas.HardwareInfo, MpInoStudio]], mscorlib",
+    "$values": []
+  },
+  "UseComm": false,
+  "CommDeviceName": null,
+  "CommBrokerAddress": null,
+  "CommID": null,
+  "CommPW": null,
+  "CommPub": {
+    "$type": "System.Collections.Generic.List`1[[System.String, mscorlib]], mscorlib",
+    "$values": []
+  },
+  "CommSub": {
+    "$type": "System.Collections.Generic.List`1[[MpInoStudio.Datas.CommSubscribeInfo, MpInoStudio]], mscorlib",
+    "$values": []
+  }
+}
