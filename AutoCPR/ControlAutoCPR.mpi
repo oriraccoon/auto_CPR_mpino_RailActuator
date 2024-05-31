@@ -35,7 +35,6 @@ int microStep = 8; //스텝 and 펄스
 int rotation = 12000; //회전수
 int baudrate = 115200;
 unsigned long int i;
-volatile bool sleep = false;
 volatile bool start = false;
 volatile bool stop = true;
 volatile bool FSR = false;
