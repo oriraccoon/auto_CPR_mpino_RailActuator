@@ -56,23 +56,13 @@ void setup() {
 // 정지버튼 동작코드
 void _STOP()
 {
-	start = false;
   stop = true;
-  sleep = false;
-	Serial.println( "btn detected" );
 }
 
 // 대기버튼 동작코드
 void _SLEEP()
 {
-	sleep = !sleep;
-	start = false;
-	if ( sleep == false)
-	{
-		start = true;
-		
-	}
-	
+	start = !start;	
 }
 	
 
@@ -108,7 +98,10 @@ void loop()
 			delayMicroseconds( 10 );
 			attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING );
 			attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );
+      if(!(start == true && stop == false)) break;
 		}
+    if(!(start == true && stop == false)) break;
+    
 		delay( 500 );
 
 		//모터 방향
@@ -126,7 +119,9 @@ void loop()
 			delayMicroseconds( 10 );
 			attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING );
 			attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );
+      if(!(start == true && stop == false)) break;
 		}
+    if(!(start == true && stop == false)) break;
 		delay( 500 );
 	}
 }
