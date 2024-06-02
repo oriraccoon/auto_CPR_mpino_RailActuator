@@ -83,7 +83,6 @@ void _STOP()
 // 대기버튼 동작코드
 void _SLEEP()
 {
-	start = !start;
 	sleep = !sleep;
 }
 	
@@ -125,17 +124,14 @@ void loop()
 			delayMicroseconds( speed );
 			attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING );
 			attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );
-			while ( sleep == true )
-			{
-				attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );
-			}
+			while ( sleep == true )	{}
 			if ( !( start == true && stop == false ) ) break;
 			
 		}
-    	if(!(start == true && stop == false)) break;
-    
+    	   
 		delay( 500 );
-
+		
+		if(!(start == true && stop == false)) break;
 		//모터 방향
 		digitalWrite( Z_DIR, HIGH );
 		digitalWrite( X_DIR, LOW );
@@ -153,13 +149,11 @@ void loop()
 			delayMicroseconds( speed );
 			attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING );
 			attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );
-			while ( sleep == true )
-			{
-				attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );
-			}
+			while ( sleep == true )	{}
       		if(!(start == true && stop == false)) break;
 		}
-    	if(!(start == true && stop == false)) break;
 		delay( 500 );
+		
+		if(!(start == true && stop == false)) break;
 	}
 }
