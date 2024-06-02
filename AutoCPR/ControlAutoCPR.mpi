@@ -20,31 +20,47 @@
       모터가 끝에 닿으면 굉음나고 고장날까봐 무서우니 조심하세요
 
 
+수정 할 사항
+- 대기 버튼 현재 상태 저장할 수 있게 수정
+
 
 */
 
 #include <Wire.h>
 
-int Y_PUL = 7;
-int Y_DIR = 8;
-int X_PUL = 5;
-int X_DIR = 6;
-int STOPbtn = 3;
-int SLEEPbtn = 2;
-int microStep = 8; //스텝 and 펄스
-int rotation = 12000; //회전수
-int baudrate = 115200;
+#define Z_PUL 7
+#define Z_DIR 8
+#define X_PUL 5
+#define X_DIR 6
+
+#define Z_Limit1 22	// 모터쪽
+#define Z_Limit2 23
+#define X_Limit1 24	// 모터쪽
+#define X_Limit2 25
+
+#define STOPbtn 3
+#define SLEEPbtn 2
+
+#define microStep 8 //스텝 and 펄스
+#define rotation 12000 //회전수
+#define baudrate 115200
+#define speed 30
 unsigned long int i;
-volatile bool start = false;
 volatile bool stop = true;
+volatile bool start = false;
 volatile bool FSR = false;
+
 void setup() {
 	Wire.begin();
 	Serial.begin( baudrate );
-	pinMode( Y_PUL, OUTPUT );
-	pinMode( Y_DIR, OUTPUT );
+	pinMode( Z_PUL, OUTPUT );
+	pinMode( Z_DIR, OUTPUT );
 	pinMode( X_PUL, OUTPUT );
 	pinMode( X_DIR, OUTPUT );
+	pinMode( Z_Limit1, INPUT_PULLUP );
+	pinMode( Z_Limit2, INPUT_PULLUP );
+	pinMode( X_Limit1, INPUT_PULLUP );
+	pinMode( X_Limit2, INPUT_PULLUP );
 	pinMode( STOPbtn, INPUT_PULLUP );
 	pinMode( SLEEPbtn, INPUT_PULLUP );
 	delay( 0 );
@@ -61,13 +77,16 @@ void _STOP()
 // 대기버튼 동작코드
 void _SLEEP()
 {
-	start = !start;	
+	start = !start;
+	while ( start == false )
+	{
+	}
 }
 	
 
 void loop()
 {
-  // Slave에서 I2C통신으로 받을 포멧 설정 (Slave_num, len_byte)
+    // Slave에서 I2C통신으로 받을 포멧 설정 (Slave_num, len_byte)
 	Wire.requestFrom( 8, 3 );
 	// 데이터 받았으면
 	if ( Wire.available() == 3 )
@@ -77,50 +96,60 @@ void loop()
 		if ( btn_status == 1 )
 		{
 			start = true;
-      stop = false;
+			stop = false;
 		}
 	}
+	
 	while ( start == true && stop == false)
 	{
-		//모터 반대 방향
-		digitalWrite( Y_DIR, LOW );
+		//모터 반대 방향 // Z : HIGH - 모터방향 X : HIGH - 모터 반대방향
+		digitalWrite( Z_DIR, LOW );
 		digitalWrite( X_DIR, HIGH );
 		for ( i = 0; i < ( microStep * rotation ); i++ ) // microStep * rotation 값이 커질수록 많이 이동하는데 이상하게 일정 값이 넘으면 for문에서 못 벗어남
 		{
-			digitalWrite( Y_PUL, HIGH );
-			delayMicroseconds( 10 ); //속도
-			digitalWrite( Y_PUL, LOW );
-			delayMicroseconds( 10 );
-			digitalWrite( X_PUL, HIGH );
-			delayMicroseconds( 10 );
-			digitalWrite( X_PUL, LOW );
-			delayMicroseconds( 10 );
-			attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING );
-			attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );
-      if(!(start == true && stop == false)) break;
+			//if ( digitalRead( Z_Limit2 ) == HIGH ) digitalWrite( Z_DIR, HIGH );
+			//else if ( digitalRead( X_Limit2 ) == HIGH ) digitalWrite( X_DIR, LOW );
+			//if ( digitalRead( Z_Limit1 ) == LOW ) digitalWrite( Z_DIR, HIGH );
+			//else if ( digitalRead( X_Limit1 ) == HIGH ) digitalWrite( X_DIR, LOW );
+			if ( digitalRead( Z_Limit2 ) == HIGH )
+			{
+				digitalWrite( Z_PUL, HIGH );
+				delayMicroseconds( speed ); //속도
+				digitalWrite( Z_PUL, LOW );
+				delayMicroseconds( speed );
+				digitalWrite( X_PUL, HIGH );
+				delayMicroseconds( speed );
+				digitalWrite( X_PUL, LOW );
+				delayMicroseconds( speed );
+				attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING );
+				attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );
+				if ( !( start == true && stop == false ) ) break;
+			}
 		}
-    if(!(start == true && stop == false)) break;
+    	if(!(start == true && stop == false)) break;
     
 		delay( 500 );
 
 		//모터 방향
-		digitalWrite( Y_DIR, HIGH );
+		digitalWrite( Z_DIR, HIGH );
 		digitalWrite( X_DIR, LOW );
 		for ( i = 0; i < ( microStep * rotation ); i++ )
 		{
-			digitalWrite( Y_PUL, HIGH );
-			delayMicroseconds( 1 );
-			digitalWrite( Y_PUL, LOW );
-			delayMicroseconds( 1 );
+			if ( digitalRead( Z_Limit1 ) == LOW ) break;
+			else if ( digitalRead( X_Limit1 ) == LOW ) break;
+			digitalWrite( Z_PUL, HIGH );
+			delayMicroseconds( speed );
+			digitalWrite( Z_PUL, LOW );
+			delayMicroseconds( speed );
 			digitalWrite( X_PUL, HIGH );
-			delayMicroseconds( 10 );
+			delayMicroseconds( speed );
 			digitalWrite( X_PUL, LOW );
-			delayMicroseconds( 10 );
+			delayMicroseconds( speed );
 			attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING );
 			attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );
-      if(!(start == true && stop == false)) break;
+      		if(!(start == true && stop == false)) break;
 		}
-    if(!(start == true && stop == false)) break;
+    	if(!(start == true && stop == false)) break;
 		delay( 500 );
 	}
 }
