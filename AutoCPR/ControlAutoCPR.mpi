@@ -7,10 +7,10 @@
       버튼 동작						          O
       압력 센서 받기					      X
       심박 센서 받기					      X
-      색인지 센서 빋기				       X
-      색인지 위치까지 모터 구동		    X
-      압력 센서 인식 시 모터 정지		  X
-      정지 버튼 초기 위치로			      X
+      색인지 센서 빋기				       	  X
+      색인지 위치까지 모터 구동		    	  X
+      압력 센서 인식 시 모터 정지		  	  X
+      정지 버튼 초기 위치로			     	  X (센서 값 들어올 때까지 이동)
 
 
       * 빠진 거 있으면 추가 바람 *
@@ -21,8 +21,12 @@
 
 
 수정 할 사항
-- 대기 버튼 현재 상태 저장할 수 있게 수정
+- 센서 값 잘 읽게 설정하기(현재 대략 3초 간격으로 토글됨, 배선 문제일 수도)
+- 레일 따로 움직이게 하기
 
+문제 사항
+- 버튼 인식 잘 안됨
+- 속도가 너무 느림
 
 */
 
@@ -44,10 +48,12 @@
 #define microStep 8 //스텝 and 펄스
 #define rotation 12000 //회전수
 #define baudrate 115200
-#define speed 30
-unsigned long int i;
+#define speed 3
+
+unsigned long long i;
 volatile bool stop = true;
 volatile bool start = false;
+volatile bool sleep = false;
 volatile bool FSR = false;
 
 void setup() {
@@ -78,9 +84,7 @@ void _STOP()
 void _SLEEP()
 {
 	start = !start;
-	while ( start == false )
-	{
-	}
+	sleep = !sleep;
 }
 	
 
@@ -111,20 +115,22 @@ void loop()
 			//else if ( digitalRead( X_Limit2 ) == HIGH ) digitalWrite( X_DIR, LOW );
 			//if ( digitalRead( Z_Limit1 ) == LOW ) digitalWrite( Z_DIR, HIGH );
 			//else if ( digitalRead( X_Limit1 ) == HIGH ) digitalWrite( X_DIR, LOW );
-			if ( digitalRead( Z_Limit2 ) == HIGH )
+			digitalWrite( Z_PUL, HIGH );
+			delayMicroseconds( speed ); //속도
+			digitalWrite( Z_PUL, LOW );
+			delayMicroseconds( speed );
+			digitalWrite( X_PUL, HIGH );
+			delayMicroseconds( speed );
+			digitalWrite( X_PUL, LOW );
+			delayMicroseconds( speed );
+			attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING );
+			attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );
+			while ( sleep == true )
 			{
-				digitalWrite( Z_PUL, HIGH );
-				delayMicroseconds( speed ); //속도
-				digitalWrite( Z_PUL, LOW );
-				delayMicroseconds( speed );
-				digitalWrite( X_PUL, HIGH );
-				delayMicroseconds( speed );
-				digitalWrite( X_PUL, LOW );
-				delayMicroseconds( speed );
-				attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING );
 				attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );
-				if ( !( start == true && stop == false ) ) break;
 			}
+			if ( !( start == true && stop == false ) ) break;
+			
 		}
     	if(!(start == true && stop == false)) break;
     
@@ -135,8 +141,8 @@ void loop()
 		digitalWrite( X_DIR, LOW );
 		for ( i = 0; i < ( microStep * rotation ); i++ )
 		{
-			if ( digitalRead( Z_Limit1 ) == LOW ) break;
-			else if ( digitalRead( X_Limit1 ) == LOW ) break;
+			//if ( digitalRead( Z_Limit1 ) == LOW ) break;
+			//else if ( digitalRead( X_Limit1 ) == LOW ) break;
 			digitalWrite( Z_PUL, HIGH );
 			delayMicroseconds( speed );
 			digitalWrite( Z_PUL, LOW );
@@ -147,6 +153,10 @@ void loop()
 			delayMicroseconds( speed );
 			attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING );
 			attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );
+			while ( sleep == true )
+			{
+				attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );
+			}
       		if(!(start == true && stop == false)) break;
 		}
     	if(!(start == true && stop == false)) break;
