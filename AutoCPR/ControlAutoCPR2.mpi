@@ -1,8 +1,8 @@
 /*
 
-      2024년 6월 2일자 수정본
+      2024년 6월 3일자 수정본
 
-ver1.0	버튼 인터럽트
+ver1.1 버튼 인터럽트, 통신 X
 
 -----------------할일---------------------
       모터 구동						          O
@@ -44,8 +44,9 @@ ver1.0	버튼 인터럽트
 #define X_Limit1 24	// 모터쪽
 #define X_Limit2 25
 
-#define STOPbtn 3
-#define SLEEPbtn 2
+#define STOPbtn 26
+#define SLEEPbtn 27
+#define STARTbtn 28
 
 #define microStep 8 //스텝 and 펄스
 #define rotation 12000 //회전수
@@ -72,40 +73,17 @@ void setup() {
 	pinMode( STOPbtn, INPUT_PULLUP );
 	pinMode( SLEEPbtn, INPUT_PULLUP );
 	delay( 0 );
-	attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING ); 	// 정지버튼 눌렸을 때 _STOP함수 실행
-	attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );	// 대기버튼 눌렸을 때 _SLEEP함수 실행
 }
-
-// 정지버튼 동작코드
-void _STOP()
-{
-  stop = true;
-}
-
-// 대기버튼 동작코드
-void _SLEEP()
-{
-	sleep = !sleep;
-}
-	
 
 void loop()
 {
-    // Slave에서 I2C통신으로 받을 포멧 설정 (Slave_num, len_byte)
-	Wire.requestFrom( 8, 3 );
-	// 데이터 받았으면
-	if ( Wire.available() == 3 )
+	if ( digitalRead( STARTbtn ) )
 	{
-    // 받은 값 입력
-		int btn_status = Wire.read();
-		if ( btn_status == 1 )
-		{
-			start = true;
-			stop = false;
-		}
+		start = true;
+		stop = false;
 	}
 	
-	while ( start == true && stop == false)
+	while ( start == true && stop == false )
 	{
 		//모터 반대 방향 // Z : HIGH - 모터방향 X : HIGH - 모터 반대방향
 		digitalWrite( Z_DIR, LOW );
@@ -124,16 +102,19 @@ void loop()
 			delayMicroseconds( speed );
 			digitalWrite( X_PUL, LOW );
 			delayMicroseconds( speed );
-			attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING );
-			attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );
-			while ( sleep == true )	{}
-			if ( !( start == true && stop == false ) ) break;
+			if ( digitalRead( STOPbtn ) ) stop = true;
+			else if ( digitalRead( SLEEPbtn ) ) sleep = !sleep;
+			while ( sleep == true )
+			{
+				if ( digitalRead( SLEEPbtn ) ) sleep = !sleep;
+			}
+			if ( stop ) break;
 			
 		}
     	   
 		delay( 500 );
 		
-		if(!(start == true && stop == false)) break;
+		if ( stop ) break;
 		//모터 방향
 		digitalWrite( Z_DIR, HIGH );
 		digitalWrite( X_DIR, LOW );
@@ -149,13 +130,16 @@ void loop()
 			delayMicroseconds( speed );
 			digitalWrite( X_PUL, LOW );
 			delayMicroseconds( speed );
-			attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING );
-			attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING );
-			while ( sleep == true )	{}
-      		if(!(start == true && stop == false)) break;
+			if ( digitalRead( STOPbtn ) ) stop = true;
+			else if ( digitalRead( SLEEPbtn ) ) sleep = !sleep;
+			while ( sleep == true )
+			{
+				if ( digitalRead( SLEEPbtn ) ) sleep = !sleep;
+			}
+      		if ( stop ) break;
 		}
 		delay( 500 );
 		
-		if(!(start == true && stop == false)) break;
+		if ( stop ) break;
 	}
 }
