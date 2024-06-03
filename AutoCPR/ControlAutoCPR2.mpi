@@ -58,95 +58,110 @@ volatile bool start = false;
 volatile bool sleep = false;
 volatile bool FSR = false;
 
-void setup() {
-    Wire.begin();
-    Serial.begin(baudrate);
-    pinMode(Z_PUL, OUTPUT);
-    pinMode(Z_DIR, OUTPUT);
-    pinMode(X_PUL, OUTPUT);
-    pinMode(X_DIR, OUTPUT);
-    pinMode(Z_Limit1, INPUT_PULLUP);
-    pinMode(Z_Limit2, INPUT_PULLUP);
-    pinMode(X_Limit1, INPUT_PULLUP);
-    pinMode(X_Limit2, INPUT_PULLUP);
-    pinMode(STOPbtn, INPUT_PULLUP);
-    pinMode(SLEEPbtn, INPUT_PULLUP);
+void setup()
+{
+	Wire.begin();
+	Serial.begin( baudrate );
+	pinMode( Z_PUL, OUTPUT );
+	pinMode( Z_DIR, OUTPUT );
+	pinMode( X_PUL, OUTPUT );
+	pinMode( X_DIR, OUTPUT );
+	pinMode( Z_Limit1, INPUT_PULLUP );
+	pinMode( Z_Limit2, INPUT_PULLUP );
+	pinMode( X_Limit1, INPUT_PULLUP );
+	pinMode( X_Limit2, INPUT_PULLUP );
+	pinMode( STOPbtn, INPUT_PULLUP );
+	pinMode( SLEEPbtn, INPUT_PULLUP );
 
-    // 인터럽트를 핀에 설정
-    attachInterrupt(digitalPinToInterrupt(STOPbtn), _STOP, FALLING); // 정지버튼 눌렸을 때 _STOP함수 실행
-    attachInterrupt(digitalPinToInterrupt(SLEEPbtn), _SLEEP, FALLING); // 대기버튼 눌렸을 때 _SLEEP함수 실행
+	// 인터럽트를 핀에 설정
+	attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING ); // 정지버튼 눌렸을 때 _STOP함수 실행
+	attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING ); // 대기버튼 눌렸을 때 _SLEEP함수 실행
 }
 
 // 정지버튼 동작코드
-void _STOP() {
-    stop = true;
+void _STOP()
+{
+	stop = true;
 }
 
 // 대기버튼 동작코드
-void _SLEEP() {
-    sleep = !sleep;
+void _SLEEP()
+{
+	sleep = !sleep;
 }
 
-void loop() {
-    // Slave에서 I2C통신으로 받을 포멧 설정 (Slave_num, len_byte)
-    Wire.requestFrom(8, 3);
-    // 데이터 받았으면
-    if (Wire.available() == 3) {
-        // 받은 값 입력
-        int btn_status = Wire.read();
-        if (btn_status == 1) {
-            start = true;
-            stop = false;
-        }
-    }
+void loop()
+{
+	// Slave에서 I2C통신으로 받을 포멧 설정 (Slave_num, len_byte)
+	Wire.requestFrom( 8, 3 );
+	// 데이터 받았으면
+	if ( Wire.available() == 3 )
+	{
+		// 받은 값 입력
+		int btn_status = Wire.read();
+		if ( btn_status == 1 )
+		{
+			start = true;
+			stop = false;
+		}
+	}
 
-    while (start && !stop) {
-        // 모터 반대 방향 설정 // Z : HIGH - 모터방향 X : HIGH - 모터 반대방향
-        digitalWrite(Z_DIR, LOW);
-        digitalWrite(X_DIR, HIGH);
-        for (i = 0; i < (microStep * rotation); i++) {
-            digitalWrite(Z_PUL, HIGH);
-            delayMicroseconds(speed); // 속도
-            digitalWrite(Z_PUL, LOW);
-            delayMicroseconds(speed);
-            digitalWrite(X_PUL, HIGH);
-            delayMicroseconds(speed);
-            digitalWrite(X_PUL, LOW);
-            delayMicroseconds(speed);
+	while ( start && !stop )
+	{
+		// 모터 반대 방향 설정 // Z : HIGH - 모터방향 X : HIGH - 모터 반대방향
+		digitalWrite( Z_DIR, LOW );
+		digitalWrite( X_DIR, HIGH );
+		for ( i = 0; i < ( microStep * rotation ); i++ )
+		{
+			digitalWrite( Z_PUL, HIGH );
+			delayMicroseconds( speed ); // 속도
+			digitalWrite( Z_PUL, LOW );
+			delayMicroseconds( speed );
+			digitalWrite( X_PUL, HIGH );
+			delayMicroseconds( speed );
+			digitalWrite( X_PUL, LOW );
+			delayMicroseconds( speed );
 
-            // 인터럽트 플래그 확인
-            if (stop || sleep) break;
-            while (sleep) {
-                // 대기 버튼이 눌려있을 때 대기 상태 유지
-                delay(100);
-            }
-        }
-        if (stop) break;
+			// 인터럽트 플래그 확인
+			if ( stop ) break;
+			while ( sleep )
+			{
+				// 대기 버튼이 눌렸을 때 대기 상태 유지
+				// 이때 정지 버튼 작동시 종료
+				if ( stop ) break;
+				delay( 1 );
 
-        delay(500);
+			}
+		}
+		if ( stop ) break;
 
-        // 모터 방향 설정
-        digitalWrite(Z_DIR, HIGH);
-        digitalWrite(X_DIR, LOW);
-        for (i = 0; i < (microStep * rotation); i++) {
-            digitalWrite(Z_PUL, HIGH);
-            delayMicroseconds(speed);
-            digitalWrite(Z_PUL, LOW);
-            delayMicroseconds(speed);
-            digitalWrite(X_PUL, HIGH);
-            delayMicroseconds(speed);
-            digitalWrite(X_PUL, LOW);
-            delayMicroseconds(speed);
+		delay( 500 );
 
-            // 인터럽트 플래그 확인
-            if (stop || sleep) break;
-            while (sleep) {
-                // 대기 버튼이 눌려있을 때 대기 상태 유지
-                delay(100);
-            }
-        }
-        if (stop) break;
+		// 모터 방향 설정
+		digitalWrite( Z_DIR, HIGH );
+		digitalWrite( X_DIR, LOW );
+		for ( i = 0; i < ( microStep * rotation ); i++ )
+		{
+			digitalWrite( Z_PUL, HIGH );
+			delayMicroseconds( speed );
+			digitalWrite( Z_PUL, LOW );
+			delayMicroseconds( speed );
+			digitalWrite( X_PUL, HIGH );
+			delayMicroseconds( speed );
+			digitalWrite( X_PUL, LOW );
+			delayMicroseconds( speed );
 
-        delay(500);
-    }
+			// 인터럽트 플래그 확인
+			if ( stop ) break;
+			while ( sleep )
+			{
+				// 대기 버튼이 눌려있을 때 대기 상태 유지
+				if ( stop ) break;
+				delay( 1 );
+			}
+		}
+		if ( stop ) break;
+
+		delay( 500 );
+	}
 }
