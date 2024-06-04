@@ -2,7 +2,8 @@
 
       2024년 6월 2일자 수정본
 
-ver1.3		광전 스위치 센서 실행방식 작성
+ver2.0		광전 스위치 센서 동작 방식 작성
+			X-Z순으로 동작
 			
 			동작테스트 미실시
 			
@@ -90,27 +91,32 @@ void setup()
 void _STOP()
 {
 	stop = true;
-	/*
+	
 	while ( !Z_LIMIT_BACK )
 	{
-		digitalWrite( Z_DIR, HIGH );
-		digitalWrite( X_DIR, HIGH );
+		Wire.requestFrom(slave_address, 3);
+		_WIRE_READ();
+		
+		_Z_BACKWARD();
+		
 		digitalWrite( Z_PUL, HIGH );
-		delayMicroseconds( 10 );
+		delayMicroseconds( 1 );
 		digitalWrite( Z_PUL, LOW );
-		delayMicroseconds( 10 );
-		
-		
+		delayMicroseconds( 1 );
 	}
 	
 	while ( !X_LIMIT_BACK )
 	{
-		digitalWrite( X_PUL, HIGH );
-		delayMicroseconds( 10 );
-		digitalWrite( X_PUL, LOW );
-		delayMicroseconds( 10 );
+		Wire.requestFrom(slave_address, 3);
+		_WIRE_READ();
 		
-	}*/
+		_X_BACKWARD();
+		
+		digitalWrite( X_PUL, HIGH );
+		delayMicroseconds( 1 );
+		digitalWrite( X_PUL, LOW );
+		delayMicroseconds( 1 );
+	}
 		
 }
 
@@ -187,7 +193,6 @@ void _WIRE_READ()
 
 void loop()
 {
-	
     Wire.requestFrom(slave_address, 3);
 	_WIRE_READ();
 	int pintest = digitalRead( test );
@@ -195,39 +200,20 @@ void loop()
 	
 	while ( start && !stop && pintest )
 	{
+		// 색인지 센서 들어오면 정지
 		// 모터 반대 방향 설정 // Z : HIGH - 모터방향 X : HIGH - 모터 반대방향
-		_Z_FORWARD();
 		_X_FORWARD();
 		for ( i = 0; i < ( microStep * rotation ); i++ )
 		{
 			Wire.requestFrom(8, 3);
 			_WIRE_READ();
 			
-			digitalWrite( Z_PUL, HIGH );
-			delayMicroseconds( speed ); // 속도
-			digitalWrite( Z_PUL, LOW );
-			delayMicroseconds( speed );
 			digitalWrite( X_PUL, HIGH );
 			delayMicroseconds( speed );
 			digitalWrite( X_PUL, LOW );
 			delayMicroseconds( speed );
 			
-			
-			
-			if ( Z_LIMIT_FOR )
-			{
-				while ( b == 3 )
-				{
-					b++;
-					delay( 1000 );
-				}
-				b = 0;
-				Z_LIMIT_FOR = false;
-				digitalWrite( Z_PUL, LOW );
-				stop = true;
-			}
-			
-			else if ( X_LIMIT_FOR )
+			if ( X_LIMIT_FOR )
 			{
 				while ( b == 3 )
 				{
@@ -257,8 +243,52 @@ void loop()
 		if ( stop ) break;
 
 		delay( 5 );
+		// 압력센서 들어오면 정지
+		_Z_FORWARD();
+		for ( i = 0; i < ( microStep * rotation ); i++ )
+		{
+			Wire.requestFrom(8, 3);
+			_WIRE_READ();
+			
+			digitalWrite( Z_PUL, HIGH );
+			delayMicroseconds( speed ); // 속도
+			digitalWrite( Z_PUL, LOW );
+			delayMicroseconds( speed );
+			
+			if ( Z_LIMIT_FOR )
+			{
+				while ( b == 3 )
+				{
+					b++;
+					delay( 1000 );
+				}
+				b = 0;
+				Z_LIMIT_FOR = false;
+				digitalWrite( Z_PUL, LOW );
+				stop = true;
+			}
+			
+			// 인터럽트 플래그 확인
+			if ( stop ) break;
+			while ( sleep )
+			{
+				// 대기 버튼이 눌렸을 때 대기 상태 유지
+				// 이때 정지 버튼 작동시 종료
+				if ( stop )
+				{
+					sleep = !sleep;
+					break;
+				}
+				delay( 1 );
 
-		// 모터 방향 설정
+			}
+		}
+		if ( stop ) break;
+
+		delay( 5 );
+		
+
+		/*// 모터 방향 설정
 		_Z_BACKWARD();
 		_X_BACKWARD();
 		for ( i = 0; i < ( microStep * rotation ); i++ )
@@ -321,7 +351,7 @@ void loop()
 		}
 		if ( stop ) break;
 
-		delay( 5 );
+		delay( 5 );*/
 		
 	}
 }
