@@ -5,7 +5,7 @@
 ver2.0		광전 스위치 센서 동작 방식 작성
 			X-Z순으로 동작
 			
-			동작테스트 미실시
+			동작테스트 성공
 			
 
 -----------------할일---------------------
@@ -32,7 +32,7 @@ ver2.0		광전 스위치 센서 동작 방식 작성
 
 문제 사항
 - 버튼 인식 잘 안됨
-- 속도가 너무 느림
+- 속도가 너무 느림, 통신 방식 SPI로 변경 예정
 
 */
 
@@ -46,18 +46,17 @@ ver2.0		광전 스위치 센서 동작 방식 작성
 #define STOPbtn 3
 #define SLEEPbtn 2
 
-#define test 22
-
 #define microStep 8 //스텝 and 펄스
-#define rotation 12000 //회전수
+#define rotation 1200000 //회전수
 #define baudrate 115200
 #define speed 10
 #define slave_address 8
 
 unsigned long long i;
 int signal;
-int b;
 volatile bool stop = true;
+volatile bool z_stop = false;
+volatile bool x_stop = false;
 volatile bool start = false;
 volatile bool sleep = false;
 volatile bool FSR = false;
@@ -78,46 +77,20 @@ void setup()
 	pinMode( Z_DIR, OUTPUT );
 	pinMode( X_PUL, OUTPUT );
 	pinMode( X_DIR, OUTPUT );
-	pinMode( test, INPUT_PULLUP );
 	pinMode( STOPbtn, INPUT_PULLUP );
 	pinMode( SLEEPbtn, INPUT_PULLUP );
 
 	// 인터럽트를 핀에 설정
 	attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING ); // 정지버튼 눌렸을 때 _STOP함수 실행
 	attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING ); // 대기버튼 눌렸을 때 _SLEEP함수 실행
+	
 }
 
 // 정지버튼 동작코드
 void _STOP()
 {
 	stop = true;
-	
-	while ( !Z_LIMIT_BACK )
-	{
-		Wire.requestFrom(slave_address, 3);
-		_WIRE_READ();
-		
-		_Z_BACKWARD();
-		
-		digitalWrite( Z_PUL, HIGH );
-		delayMicroseconds( 1 );
-		digitalWrite( Z_PUL, LOW );
-		delayMicroseconds( 1 );
-	}
-	
-	while ( !X_LIMIT_BACK )
-	{
-		Wire.requestFrom(slave_address, 3);
-		_WIRE_READ();
-		
-		_X_BACKWARD();
-		
-		digitalWrite( X_PUL, HIGH );
-		delayMicroseconds( 1 );
-		digitalWrite( X_PUL, LOW );
-		delayMicroseconds( 1 );
-	}
-		
+			
 }
 
 // 대기버튼 동작코드
@@ -193,19 +166,17 @@ void _WIRE_READ()
 
 void loop()
 {
-    Wire.requestFrom(slave_address, 3);
+    Wire.requestFrom( slave_address , 3);
 	_WIRE_READ();
-	int pintest = digitalRead( test );
-	Serial.println( pintest );
 	
-	while ( start && !stop && pintest )
+	while ( start && !stop )
 	{
 		// 색인지 센서 들어오면 정지
 		// 모터 반대 방향 설정 // Z : HIGH - 모터방향 X : HIGH - 모터 반대방향
 		_X_FORWARD();
 		for ( i = 0; i < ( microStep * rotation ); i++ )
 		{
-			Wire.requestFrom(8, 3);
+			Wire.requestFrom( slave_address , 3);
 			_WIRE_READ();
 			
 			digitalWrite( X_PUL, HIGH );
@@ -213,20 +184,31 @@ void loop()
 			digitalWrite( X_PUL, LOW );
 			delayMicroseconds( speed );
 			
+			
 			if ( X_LIMIT_FOR )
 			{
-				while ( b == 3 )
-				{
-					b++;
-					delay( 1000 );
-				}
-				b = 0;
 				X_LIMIT_FOR = false;
-				digitalWrite( X_PUL, LOW );
-				stop = true;
+				x_stop = true;
+				break;
 			}
 			// 인터럽트 플래그 확인
-			if ( stop ) break;
+			if ( stop )
+			{
+				while ( !Z_LIMIT_BACK )
+				{
+					Wire.requestFrom( slave_address, 3 );
+					_WIRE_READ();
+			
+					_Z_BACKWARD();
+			
+					digitalWrite( Z_PUL, HIGH );
+					delayMicroseconds( 1 );
+					digitalWrite( Z_PUL, LOW );
+					delayMicroseconds( 1 );
+				}
+				Z_LIMIT_BACK = false;
+				break;
+			}
 			while ( sleep )
 			{
 				// 대기 버튼이 눌렸을 때 대기 상태 유지
@@ -234,6 +216,19 @@ void loop()
 				if ( stop )
 				{
 					sleep = !sleep;
+					while ( !Z_LIMIT_BACK )
+					{
+						Wire.requestFrom( slave_address, 3 );
+						_WIRE_READ();
+				
+						_Z_BACKWARD();
+				
+						digitalWrite( Z_PUL, HIGH );
+						delayMicroseconds( 1 );
+						digitalWrite( Z_PUL, LOW );
+						delayMicroseconds( 1 );
+					}
+					Z_LIMIT_BACK = false;
 					break;
 				}
 				delay( 1 );
@@ -247,7 +242,7 @@ void loop()
 		_Z_FORWARD();
 		for ( i = 0; i < ( microStep * rotation ); i++ )
 		{
-			Wire.requestFrom(8, 3);
+			Wire.requestFrom( slave_address, 3 );
 			_WIRE_READ();
 			
 			digitalWrite( Z_PUL, HIGH );
@@ -257,19 +252,29 @@ void loop()
 			
 			if ( Z_LIMIT_FOR )
 			{
-				while ( b == 3 )
-				{
-					b++;
-					delay( 1000 );
-				}
-				b = 0;
 				Z_LIMIT_FOR = false;
-				digitalWrite( Z_PUL, LOW );
-				stop = true;
+				z_stop = true;
+				break;
 			}
 			
 			// 인터럽트 플래그 확인
-			if ( stop ) break;
+			if ( stop )
+			{
+				while ( !X_LIMIT_BACK )
+				{
+					Wire.requestFrom( slave_address, 3 );
+					_WIRE_READ();
+			
+					_X_BACKWARD();
+			
+					digitalWrite( X_PUL, HIGH );
+					delayMicroseconds( 1 );
+					digitalWrite( X_PUL, LOW );
+					delayMicroseconds( 1 );
+				}
+				X_LIMIT_BACK = false;
+				break;
+			}
 			while ( sleep )
 			{
 				// 대기 버튼이 눌렸을 때 대기 상태 유지
@@ -277,6 +282,19 @@ void loop()
 				if ( stop )
 				{
 					sleep = !sleep;
+					while ( !X_LIMIT_BACK )
+					{
+						Wire.requestFrom( slave_address, 3 );
+						_WIRE_READ();
+				
+						_X_BACKWARD();
+				
+						digitalWrite( X_PUL, HIGH );
+						delayMicroseconds( 1 );
+						digitalWrite( X_PUL, LOW );
+						delayMicroseconds( 1 );
+					}
+					X_LIMIT_BACK = false;
 					break;
 				}
 				delay( 1 );
@@ -284,7 +302,15 @@ void loop()
 			}
 		}
 		if ( stop ) break;
-
+		else if ( z_stop && x_stop )
+		{
+			x_stop = false;
+			z_stop = false;
+			stop = true;
+		
+			break;
+		}
+		
 		delay( 5 );
 		
 

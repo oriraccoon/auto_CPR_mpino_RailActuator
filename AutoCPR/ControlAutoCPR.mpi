@@ -1,11 +1,13 @@
 /*
 
-      2024년 6월 2일자 수정본
+      2024년 6월 6일자 수정본
 
-ver1.2		광전 스위치 센서 테스트 (성공)
-			STOP 스위치 초기 위치로 이동 (시도 중)
+ver3.0		I2C 통신 삭제
+			광전 센서, START버튼 digital port에 mapping
+			동작방식 수정
 			
-			동작테스트 미실시
+			
+			동작테스트 성공
 			
 
 -----------------할일---------------------
@@ -16,7 +18,9 @@ ver1.2		광전 스위치 센서 테스트 (성공)
       색인지 센서 빋기				       	  X
       색인지 위치까지 모터 구동		    	  X
       압력 센서 인식 시 모터 정지		  	  X
-      정지 버튼 초기 위치로			     	  X (센서 값 들어올 때까지 이동)
+      정지 버튼 초기 위치로			     	  O (센서 값 들어올 때까지 이동)
+	  액추에이터 연결						   X
+	  심박수 돌아오면 액추에이터 정지			X
 
 
       * 빠진 거 있으면 추가 바람 *
@@ -27,16 +31,13 @@ ver1.2		광전 스위치 센서 테스트 (성공)
 
 
 수정 할 사항
-- 현재 아두이노로 광전 스위치 센서 바로 읽게 테스트중
-
+- 동작 방식
 
 문제 사항
 - 버튼 인식 잘 안됨
-- 속도가 너무 느림
+- 속도가 느림
 
 */
-
-#include <Wire.h>
 
 #define Z_PUL 7
 #define Z_DIR 8
@@ -45,73 +46,59 @@ ver1.2		광전 스위치 센서 테스트 (성공)
 
 #define STOPbtn 3
 #define SLEEPbtn 2
+#define STARTbtn 26
 
-#define test 22
+#define Z_LIMIT_B 22
+#define Z_LIMIT_F 23
+#define X_LIMIT_B 24
+#define X_LIMIT_F 25
 
 #define microStep 8 //스텝 and 펄스
-#define rotation 12000 //회전수
+#define rotation 1200000 //회전수
 #define baudrate 115200
-#define speed 10
+#define speed 1
 
 unsigned long long i;
-int signal;
-int b;
 volatile bool stop = true;
+volatile bool z_stop = false;
+volatile bool x_stop = false;
 volatile bool start = false;
 volatile bool sleep = false;
 volatile bool FSR = false;
-volatile bool Z_LIMIT_BACK = false;
-volatile bool Z_LIMIT_FOR = false;
-volatile bool X_LIMIT_BACK = false;
-volatile bool X_LIMIT_FOR = false;
-//volatile bool Z_FORWARD = false;
-//volatile bool Z_BACKWARD = false;
-//volatile bool X_FORWARD = false;
-//volatile bool X_BACKWARD = false;
+/*
+volatile int Z_LIMIT_BACK = 0;
+volatile int Z_LIMIT_FOR = 0;
+volatile int X_LIMIT_BACK = 0;
+volatile int X_LIMIT_FOR = 0;*/
 
 void setup()
 {
-	Wire.begin();
 	Serial.begin( baudrate );
 	pinMode( Z_PUL, OUTPUT );
 	pinMode( Z_DIR, OUTPUT );
 	pinMode( X_PUL, OUTPUT );
 	pinMode( X_DIR, OUTPUT );
-	pinMode( test, INPUT_PULLUP );
+	pinMode( LED_BUILTIN, OUTPUT );
+	pinMode( STARTbtn, INPUT_PULLUP );
 	pinMode( STOPbtn, INPUT_PULLUP );
 	pinMode( SLEEPbtn, INPUT_PULLUP );
+	pinMode( Z_LIMIT_B, INPUT_PULLUP );
+	pinMode( Z_LIMIT_F, INPUT_PULLUP );
+	pinMode( X_LIMIT_B, INPUT_PULLUP );
+	pinMode( X_LIMIT_F, INPUT_PULLUP );
+	
 
 	// 인터럽트를 핀에 설정
 	attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING ); // 정지버튼 눌렸을 때 _STOP함수 실행
 	attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING ); // 대기버튼 눌렸을 때 _SLEEP함수 실행
+	
 }
 
 // 정지버튼 동작코드
 void _STOP()
 {
 	stop = true;
-	/*
-	while ( !Z_LIMIT_BACK )
-	{
-		digitalWrite( Z_DIR, HIGH );
-		digitalWrite( X_DIR, HIGH );
-		digitalWrite( Z_PUL, HIGH );
-		delayMicroseconds( 10 );
-		digitalWrite( Z_PUL, LOW );
-		delayMicroseconds( 10 );
-		
-		
-	}
-	
-	while ( !X_LIMIT_BACK )
-	{
-		digitalWrite( X_PUL, HIGH );
-		delayMicroseconds( 10 );
-		digitalWrite( X_PUL, LOW );
-		delayMicroseconds( 10 );
-		
-	}*/
-		
+			
 }
 
 // 대기버튼 동작코드
@@ -146,7 +133,7 @@ void _X_BACKWARD()
 {
 	digitalWrite( X_DIR, LOW );
 }
-
+/*
 void _WIRE_READ()
 {
 	if ( Wire.available() == 3 )
@@ -184,56 +171,95 @@ void _WIRE_READ()
 		}
 	}
 }
-
+*/
 void loop()
 {
 	
-    Wire.requestFrom(8, 3);
-	_WIRE_READ();
-	int pintest = digitalRead( test );
-	Serial.println( pintest );
-	
-	while ( start && !stop && pintest )
+	if ( digitalRead( STARTbtn ) )
 	{
+		_START();
+	}
+	
+	// stop 플래그 확인
+			if ( stop )
+			{
+				while ( !digitalRead(Z_LIMIT_B) )
+				{
+					_Z_BACKWARD();
+			
+					digitalWrite( Z_PUL, HIGH );
+					delayMicroseconds( speed );
+					digitalWrite( Z_PUL, LOW );
+					delayMicroseconds( speed );
+				}
+				delay( 1 );
+				while ( !digitalRead(X_LIMIT_B) )
+				{
+			
+					_X_BACKWARD();
+			
+					digitalWrite( X_PUL, HIGH );
+					delayMicroseconds( speed );
+					digitalWrite( X_PUL, LOW );
+					delayMicroseconds( speed );
+				}
+			}
+	
+	while ( start && !stop )
+	{
+		// 색인지 센서 들어오면 정지
 		// 모터 반대 방향 설정 // Z : HIGH - 모터방향 X : HIGH - 모터 반대방향
-		_Z_FORWARD();
 		_X_FORWARD();
 		for ( i = 0; i < ( microStep * rotation ); i++ )
 		{
-			_WIRE_READ();
-			
-			digitalWrite( Z_PUL, HIGH );
-			delayMicroseconds( speed ); // 속도
-			digitalWrite( Z_PUL, LOW );
-			delayMicroseconds( speed );
 			digitalWrite( X_PUL, HIGH );
 			delayMicroseconds( speed );
 			digitalWrite( X_PUL, LOW );
 			delayMicroseconds( speed );
 			
-			
-			
-			if ( Z_LIMIT_FOR )
+			/*
+			// 색인지카메라 값 들어오면
+			if ( colorRead )
 			{
-				while ( b == 3 )
-				{
-					b++;
-					delay( 1000 );
-				}
-				b = 0;
+				x_stop = true; // 나중에 x_stop == false; 일 때 동작하게 감싸주기
 			}
 			
-			else if ( X_LIMIT_FOR )
+			*/
+			
+			
+			if ( digitalRead(X_LIMIT_F) )
 			{
-				while ( b == 3 )
-				{
-					b++;
-					delay( 1000 );
-				}
-				b = 0;
+				//X_LIMIT_FOR = false;
+				x_stop = true;
+				break;
 			}
-			// 인터럽트 플래그 확인
-			if ( stop ) break;
+			
+			// stop 플래그 확인
+			if ( stop )
+			{
+				while ( !digitalRead(Z_LIMIT_B) )
+				{
+					_Z_BACKWARD();
+			
+					digitalWrite( Z_PUL, HIGH );
+					delayMicroseconds( speed );
+					digitalWrite( Z_PUL, LOW );
+					delayMicroseconds( speed );
+				}
+				delay( 1 );
+				while ( !digitalRead(X_LIMIT_B) )
+				{
+			
+					_X_BACKWARD();
+			
+					digitalWrite( X_PUL, HIGH );
+					delayMicroseconds( speed );
+					digitalWrite( X_PUL, LOW );
+					delayMicroseconds( speed );
+				}
+				break;
+			}
+			// sleep 플래그 확인
 			while ( sleep )
 			{
 				// 대기 버튼이 눌렸을 때 대기 상태 유지
@@ -241,71 +267,147 @@ void loop()
 				if ( stop )
 				{
 					sleep = !sleep;
-					break;
+					// 인터럽트 플래그 확인
+			
+					while ( !digitalRead(Z_LIMIT_B) )
+					{
+						_Z_BACKWARD();
+			
+						digitalWrite( Z_PUL, HIGH );
+						delayMicroseconds( speed );
+						digitalWrite( Z_PUL, LOW );
+						delayMicroseconds( speed );
+					}
+					delay( 1 );
+					while ( !digitalRead(X_LIMIT_B) )
+					{
+			
+						_X_BACKWARD();
+			
+						digitalWrite( X_PUL, HIGH );
+						delayMicroseconds( speed );
+						digitalWrite( X_PUL, LOW );
+						delayMicroseconds( speed );
+					}
 				}
 				delay( 1 );
-
+			
+				
 			}
-		}
-		if ( stop ) break;
-
-		delay( 5 );
-
-		// 모터 방향 설정
-		_Z_BACKWARD();
-		_X_BACKWARD();
-		for ( i = 0; i < ( microStep * rotation ); i++ )
-		{
-			_WIRE_READ();			
-			
-			digitalWrite( Z_PUL, HIGH );
-			delayMicroseconds( speed );
-			digitalWrite( Z_PUL, LOW );
-			delayMicroseconds( speed );
-			digitalWrite( X_PUL, HIGH );
-			delayMicroseconds( speed );
-			digitalWrite( X_PUL, LOW );
-			delayMicroseconds( speed );
-			
-
-			
-			
-			if ( Z_LIMIT_BACK )
+			if ( stop )
 			{
-				while ( b == 3 )
-				{
-					b++;
-					delay( 1000 );
-				}
-				b = 0;
+				break;
 			}
 			
-			else if ( X_LIMIT_BACK )
-			{
-				while ( b == 3 )
-				{
-					b++;
-					delay( 1000 );
-				}
-				b = 0;
-			}
-
-			// 인터럽트 플래그 확인
-			if ( stop ) break;
-			while ( sleep )
-			{
-				// 대기 버튼이 눌려있을 때 대기 상태 유지
-				if ( stop )
-				{
-					sleep = !sleep;
-					break;
-				}
-				delay( 1 );
-			}
 		}
 		if ( stop ) break;
 
 		delay( 5 );
 		
+
+		_Z_FORWARD();
+		for ( i = 0; i < ( microStep * rotation ); i++ )
+		{
+			
+			digitalWrite( Z_PUL, HIGH );
+			delayMicroseconds( speed ); // 속도
+			digitalWrite( Z_PUL, LOW );
+			delayMicroseconds( speed );
+			
+			/*
+			// 압력센서 값 들어오면
+			if ( FSR )
+			{
+				break;
+			}
+			*/
+			
+			if ( digitalRead(Z_LIMIT_F) )
+			{
+				z_stop = true;
+				break;
+			}
+			
+			// 인터럽트 플래그 확인
+			if ( stop )
+			{
+				while ( !digitalRead(Z_LIMIT_B) )
+				{
+					_Z_BACKWARD();
+			
+					digitalWrite( Z_PUL, HIGH );
+					delayMicroseconds( speed );
+					digitalWrite( Z_PUL, LOW );
+					delayMicroseconds( speed );
+				}
+				delay( 1 );
+				while ( !digitalRead(X_LIMIT_B) )
+				{
+			
+					_X_BACKWARD();
+			
+					digitalWrite( X_PUL, HIGH );
+					delayMicroseconds( speed );
+					digitalWrite( X_PUL, LOW );
+					delayMicroseconds( speed );
+				}
+				break;
+			}
+			while ( sleep )
+			{
+				// 대기 버튼이 눌렸을 때 대기 상태 유지
+				// 이때 정지 버튼 작동시 종료
+				if ( stop )
+				{
+					sleep = !sleep;
+					// 인터럽트 플래그 확인
+			
+					while ( !digitalRead(Z_LIMIT_B) )
+					{
+						_Z_BACKWARD();
+			
+						digitalWrite( Z_PUL, HIGH );
+						delayMicroseconds( speed );
+						digitalWrite( Z_PUL, LOW );
+						delayMicroseconds( speed );
+					}
+					delay( 1 );
+					while ( !digitalRead(X_LIMIT_B) )
+					{
+			
+						_X_BACKWARD();
+			
+						digitalWrite( X_PUL, HIGH );
+						delayMicroseconds( speed );
+						digitalWrite( X_PUL, LOW );
+						delayMicroseconds( speed );
+					}
+				}
+				delay( 1 );
+			
+				
+			}
+			if ( stop )
+			{
+				break;
+			}
+		}
+		if ( stop ) break;
+		
+		else if ( z_stop && x_stop )
+		{
+			x_stop = false;
+			z_stop = false;
+			stop = true;
+			// 위 아래 존재 여부 생각하고 액추에이터 코드 작성
+			break;
+		}
+		
+		delay( 5 );
+		
+
+		
 	}
+	start = false;
+			stop = false;
 }
