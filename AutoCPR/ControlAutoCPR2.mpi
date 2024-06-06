@@ -172,6 +172,11 @@ void loop()
 		_Z_FORWARD();
 		for ( i = 0; i < ( microStep * rotation ); i++ )
 		{
+			if ( digitalRead(X_LIMIT_F) )
+			{
+				break;
+			}
+			
 			digitalWrite( X_PUL, HIGH );
 			delayMicroseconds( speed );
 			digitalWrite( X_PUL, LOW );
@@ -186,11 +191,6 @@ void loop()
 			
 			*/
 			
-			
-			if ( digitalRead(X_LIMIT_F) )
-			{
-				break;
-			}
 			
 			// sleep 플래그 확인
 			while ( sleep )
@@ -220,6 +220,11 @@ void loop()
 		for ( i = 0; i < ( microStep * rotation ); i++ )
 		{
 			
+			if ( digitalRead(Z_LIMIT_F) )
+			{
+				break;
+			}
+			
 			digitalWrite( Z_PUL, HIGH );
 			delayMicroseconds( speed ); // 속도
 			digitalWrite( Z_PUL, LOW );
@@ -232,11 +237,6 @@ void loop()
 				break;
 			}
 			*/
-			
-			if ( digitalRead(Z_LIMIT_F) )
-			{
-				break;
-			}
 			
 			// sleep 플래그 확인
 			while ( sleep )
