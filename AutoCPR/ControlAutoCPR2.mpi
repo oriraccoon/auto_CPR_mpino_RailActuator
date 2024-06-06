@@ -51,6 +51,8 @@ ver3.1		STOPbtn 동작 X,Z 동시 동작
 #define X_LIMIT_B 24
 #define X_LIMIT_F 25
 
+#define FSR_sensor A0
+
 #define microStep 8 //스텝 and 펄스
 #define rotation 1200000 //회전수
 #define baudrate 115200
@@ -80,7 +82,7 @@ void setup()
 	pinMode( Z_LIMIT_F, INPUT_PULLUP );
 	pinMode( X_LIMIT_B, INPUT_PULLUP );
 	pinMode( X_LIMIT_F, INPUT_PULLUP );
-	
+	pinMode ( FSR_sensor, INPUT_PULLUP );
 
 	// 인터럽트를 핀에 설정
 	attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING ); // 정지버튼 눌렸을 때 _STOP함수 실행
@@ -152,6 +154,7 @@ void _RESET()
 
 void loop()
 {
+	Serial.println( analogRead( FSR_sensor ));
 	
 	if ( digitalRead( STARTbtn ) )
 	{
