@@ -1,26 +1,24 @@
 /*
 
-      2024년 6월 6일 02:30 수정본
-	  작성자 : 김지환
+      2024년 6월 14일 18:57 수정본
+     작성자 : 김지환
 
-ver3.2		STOPbtn 동작 X,Z 동시 동작
-			동작 방식 수정(압박, 심박, 색인지, 액추에이터 코드 위치 주석처리)			
-			압박 동작 성공
-			
-			동작테스트 미실시
-			
+ver3.4   심박센서 값 추가(연결하고 주석 제거하면 됨)
+
+         동작테스트 미실시         
 
 -----------------할일---------------------
-      모터 구동						          O
-      버튼 동작						          O
-      압력 센서 받기					      X
-      심박 센서 받기					      X
-      색인지 센서 빋기				       	  X
-      색인지 위치까지 모터 구동		    	  X
-      압력 센서 인식 시 모터 정지		  	  X
-      정지 버튼 초기 위치로			     	  O (센서 값 들어올 때까지 이동)
-	  액추에이터 연결						   X
-	  심박수 돌아오면 액추에이터 정지			X
+      모터 구동                            O
+      버튼 동작                            O
+      압력 센서 받기                     O
+      심박 센서 받기                     X
+      색인지 센서 받기                        X
+      색인지 위치까지 X_모터 구동               X
+      압력 센서 인식 시 Z_모터 정지             O
+      정지 버튼 초기 위치로                   O (센서 값 들어올 때까지 이동)
+     액추에이터 연결                     X
+     심박수 돌아오면 액추에이터 정지         X
+     홀 센서로 압박 횟수 표시				X
 
 
       * 빠진 거 있으면 추가 바람 *
@@ -43,8 +41,8 @@ ver3.2		STOPbtn 동작 X,Z 동시 동작
 #define X_PUL 5
 #define X_DIR 6
 
-#define STOPbtn 3
-#define SLEEPbtn 2
+#define STOPbtn 27
+#define SLEEPbtn 28
 #define STARTbtn 26
 
 #define Z_LIMIT_B 22
@@ -53,16 +51,22 @@ ver3.2		STOPbtn 동작 X,Z 동시 동작
 #define X_LIMIT_F 25
 
 #define FSR_sensor A0
+//#define PULSE_sensor A1
 
 #define microStep 8 //스텝 and 펄스
 #define rotation 1200000 //회전수
 #define baudrate 115200
-#define speed 100
+#define speed 1
 
 unsigned long long i;
 volatile bool stop = false;
 volatile bool start = false;
 volatile bool sleep = false;
+volatile bool rescue = false;
+volatile bool FSR_detected = false;
+volatile bool pulse_detected = false;
+volatile int pulse_val = 0;
+volatile int FSR_val = 0;
 
 volatile bool Z_LIMIT_BACK = false;
 volatile bool X_LIMIT_BACK = false;
@@ -86,15 +90,48 @@ void setup()
    pinMode( X_LIMIT_F, INPUT_PULLUP );
 
    // 인터럽트를 핀에 설정
-   attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING ); // 정지버튼 눌렸을 때 _STOP함수 실행
-   attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING ); // 대기버튼 눌렸을 때 _SLEEP함수 실행
+   //attachInterrupt( digitalPinToInterrupt( STOPbtn ), _STOP, FALLING ); // 정지버튼 눌렸을 때 _STOP함수 실행
+   //attachInterrupt( digitalPinToInterrupt( FSR_sensor ), _FSR, FALLING );
+   //attachInterrupt( digitalPinToInterrupt( SLEEPbtn ), _SLEEP, FALLING ); // 대기버튼 눌렸을 때 _SLEEP함수 실행
+  
+  cli();  // 인터럽트 비활성화
+  TCCR5A = 0;
+  TCCR5B = 0;
+  TCNT5 = 0;
+  OCR5A = 8000;  // 수가 줄수록 빨리 인터럽트
+  TCCR5B |= (1 << WGM52);  // CTC 모드
+  TCCR5B |= (1 << CS52) | (1 << CS50);  // 1024 분주 설정
+  TIMSK5 |= (1 << OCIE5A);  // 타이머 비교 인터럽트 허용
+  sei();  // 인터럽트 활성화
+   
    
 }
+
+void delayNanoseconds(unsigned int ns) {
+  // 대략적인 딜레이를 위해 어셈블리어 nop 명령어 사용
+  unsigned int cycles = (F_CPU / 1000000000L) * ns / 3;
+  for (unsigned int i = 0; i < cycles; i++) {
+    asm volatile ("nop");
+  }
+}
+
+ISR( TIMER5_COMPA_vect )
+{
+	FSR_val = analogRead( FSR_sensor );
+	// pulse_val = analogRead( PULSE_sensor) ;
+	if ( FSR_val > 100 ) FSR_detected = true;
+	else FSR_detected = false;
+	/* if ( pulse_val > 70 ) pulse_detected = true;
+	else pulse_detected = false;
+	*/
+}
+
 
 // 정지버튼 동작코드
 void _STOP()
 {
    stop = true;
+	_RESET();
          
 }
 
@@ -102,6 +139,7 @@ void _STOP()
 void _SLEEP()
 {
    sleep = !sleep;
+	delay( 100 );
 }
 
 // 시작버튼 동작코드
@@ -134,11 +172,10 @@ void _RESET()
 {
    while ( !Z_LIMIT_BACK || !X_LIMIT_BACK )
    {
-      _Z_FORWARD();
-      _X_FORWARD();
+      _Z_BACKWARD();
+      _X_BACKWARD();
       if ( digitalRead( Z_LIMIT_B ) ) Z_LIMIT_BACK = true;
       if ( digitalRead( X_LIMIT_B ) ) X_LIMIT_BACK = true;
-      
       if(!Z_LIMIT_BACK){
          digitalWrite( Z_PUL, HIGH );
          delayMicroseconds( speed );
@@ -150,27 +187,37 @@ void _RESET()
          digitalWrite( X_PUL, HIGH );
          delayMicroseconds( speed );
          digitalWrite( X_PUL, LOW );
-         delayMicroseconds( speed );
-      }
+         delayMicroseconds( speed );			
+		}
+		
+		while ( sleep )
+		{
+			if ( digitalRead( STOPbtn ) )
+			{
+				rescue = true;
+				break;
+			}
+		}
+		
+		if ( rescue ) break;
+			
    }
+	rescue = false;
    Z_LIMIT_BACK = false;
    X_LIMIT_BACK = false;
 }
 
 void loop()
 {
-	Serial.println( analogRead( FSR_sensor ) );
-	delay( 500 );
-   
    if ( digitalRead( STARTbtn ) )
    {
       _START();
    }
    
    // stop 플래그 확인
-   if ( stop )
+   if ( digitalRead(STOPbtn) )
    {
-      _RESET();
+		_STOP();
    }
    
    while ( start )
@@ -182,8 +229,11 @@ void loop()
       for ( i = 0; i < ( microStep * rotation ); i++ )
       {
         
-         if ( digitalRead( X_LIMIT_F ) ) X_LIMIT_FOR = true;
-         if ( X_LIMIT_FOR ) break;
+			if ( digitalRead( X_LIMIT_F ) )
+			{
+				X_LIMIT_FOR = true;
+				break;
+			}
          
          digitalWrite( X_PUL, HIGH );
          delayMicroseconds( speed );
@@ -196,28 +246,38 @@ void loop()
          {
             x_stop = true; // 나중에 x_stop == false; 일 때 동작하게 감싸주기
          }
-         
          */
          
+			if ( digitalRead( SLEEPbtn ) )
+			{
+				_SLEEP();
+			}
+		
          
          // sleep 플래그 확인
          while ( sleep )
          {
             // 대기 버튼이 눌렸을 때 대기 상태 유지
-            // 이때 정지 버튼 작동시 종료
-            if ( stop )
+				// 이때 정지 버튼 작동시 종료
+            if ( digitalRead(STOPbtn) )
             {
                sleep = !sleep;
+					stop = true;
             }
+            
+			else if ( digitalRead( SLEEPbtn ) )
+			{
+				_SLEEP();
+			}
             delay( 1 );            
          }
 
          // stop 플래그 확인
-         if ( stop )
-         {
-            _RESET();
-            break;
-         }
+		if ( digitalRead( STOPbtn ) || stop)
+		{
+			_STOP();
+				break;
+		}
       }
 
       if ( stop ) break;
@@ -228,47 +288,63 @@ void loop()
       for ( i = 0; i < ( microStep * rotation ); i++ )
       {
          
-         if ( digitalRead( Z_LIMIT_F ) ) Z_LIMIT_FOR = true;
-         if ( Z_LIMIT_FOR ) break;
+			if ( digitalRead( Z_LIMIT_F ) )
+			{
+				Z_LIMIT_FOR = true;
+				break;
+			}
 
          digitalWrite( Z_PUL, HIGH );
          delayMicroseconds( speed ); // 속도
          digitalWrite( Z_PUL, LOW );
          delayMicroseconds( speed );
          
+			
+			if ( FSR_detected )
+			{
+				break;
+			}
          
-         // 압력센서 값 들어오면
-         if ( analogRead(FSR_sensor) >= 15 )
-         {
-            break;
-         }
-         
+			if ( digitalRead( SLEEPbtn ) )
+			{
+				_SLEEP();
+			}
          
          // sleep 플래그 확인
          while ( sleep )
          {
             // 대기 버튼이 눌렸을 때 대기 상태 유지
             // 이때 정지 버튼 작동시 종료
-            if ( stop )
+            if ( digitalRead(STOPbtn) )
             {
                sleep = !sleep;
-            }
+					stop = true;
+					
+					}
+					else if ( digitalRead( SLEEPbtn ) )
+					{
+						_SLEEP();
+					}
             delay( 1 );            
          }
          
          // stop 플래그 확인
-         if ( stop )
-         {
-            _RESET();
-            break;
-         }
+         if ( digitalRead( STOPbtn )|| stop)
+		{
+			_STOP();
+				break;
+		}
       }
       if ( stop ) break;
       /*
-      else if ( analogRead(FSR_sensor) >= 15 )
+      else if ( FSR_detected )
       {
-         // 액추에이터 코드 작성
-            // 심장 박동 돌아오면 정지
+		// 심박 돌아올 때까지
+		while ( !pulse_detected )
+		{
+			// 액추에이터 코드 작성
+			
+		}
 
          _RESET();
 
@@ -277,7 +353,7 @@ void loop()
       */
       delay( 5 );
       
-      if ( Z_LIMIT_FOR && X_LIMIT_FOR )
+      if ( (Z_LIMIT_FOR && X_LIMIT_FOR) || ( FSR_detected && X_LIMIT_FOR))
       {
          Z_LIMIT_FOR = false;
          X_LIMIT_FOR = false;
