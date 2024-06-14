@@ -9,16 +9,16 @@ ver3.4   심박센서 값 추가(연결하고 주석 제거하면 됨)
          
 
 -----------------할일---------------------
-      모터 구동                            O
-      버튼 동작                            O
-      압력 센서 받기                     O
-      심박 센서 받기                     X
-      색인지 센서 받기                        X
-      색인지 위치까지 X_모터 구동               X
-      압력 센서 인식 시 Z_모터 정지             O
-      정지 버튼 초기 위치로                   O (센서 값 들어올 때까지 이동)
-     액추에이터 연결                     X
-     심박수 돌아오면 액추에이터 정지         X
+      모터 구동								O
+      버튼 동작								O
+      압력 센서 받기						O
+      심박 센서 받기						X
+      색인지 센서 받기						X
+      색인지 위치까지 X_모터 구동			X
+      압력 센서 인식 시 Z_모터 정지			O
+      정지 버튼 초기 위치로					O (센서 값 들어올 때까지 이동)
+     액추에이터 연결						X
+     심박수 돌아오면 액추에이터 정지		X
      홀 센서로 압박 횟수 표시				X
 
 
@@ -41,6 +41,9 @@ ver3.4   심박센서 값 추가(연결하고 주석 제거하면 됨)
 #define Z_DIR 8
 #define X_PUL 5
 #define X_DIR 6
+#define Actuator_PWM 3
+#define Actuator_FOR 62
+#define Actuator_BACK 63
 
 #define STOPbtn 27
 #define SLEEPbtn 28
@@ -76,19 +79,22 @@ volatile bool X_LIMIT_FOR = false;
 
 void setup()
 {
-	Serial.begin( baudrate );
-	pinMode( Z_PUL, OUTPUT );
-	pinMode( Z_DIR, OUTPUT );
-	pinMode( X_PUL, OUTPUT );
-	pinMode( X_DIR, OUTPUT );
-	pinMode( LED_BUILTIN, OUTPUT );
-	pinMode( STARTbtn, INPUT_PULLUP );
-	pinMode( STOPbtn, INPUT_PULLUP );
-	pinMode( SLEEPbtn, INPUT_PULLUP );
-	pinMode( Z_LIMIT_B, INPUT_PULLUP );
-	pinMode( Z_LIMIT_F, INPUT_PULLUP );
-	pinMode( X_LIMIT_B, INPUT_PULLUP );
-	pinMode( X_LIMIT_F, INPUT_PULLUP );
+	Serial.begin( baudrate 				);
+	pinMode( Z_PUL, OUTPUT 				);
+	pinMode( Z_DIR, OUTPUT 				);
+	pinMode( X_PUL, OUTPUT 				);
+	pinMode( X_DIR, OUTPUT 				);
+	pinMode( LED_BUILTIN, OUTPUT 		);
+	pinMode( STARTbtn, INPUT_PULLUP 	);
+	pinMode( STOPbtn, INPUT_PULLUP 		);
+	pinMode( SLEEPbtn, INPUT_PULLUP 	);
+	pinMode( Z_LIMIT_B, INPUT_PULLUP 	);
+	pinMode( Z_LIMIT_F, INPUT_PULLUP 	);
+	pinMode( X_LIMIT_B, INPUT_PULLUP 	);
+	pinMode( X_LIMIT_F, INPUT_PULLUP 	);
+	pinMode( Actuator_PWM, OUTPUT 		);
+	pinMode( Actuator_FOR, OUTPUT 		);
+	pinMode( Actuator_BACK, OUTPUT 		);
 
 	cli();  // 인터럽트 비활성화
 	TCCR5A = 0;
@@ -336,21 +342,30 @@ void loop()
 			}
 		}
 		if ( stop ) break;
-		/*
-		else if ( FSR_detected )
+		
+		else if ( ( FSR_detected && X_LIMIT_FOR )  )
 		{
+			i = 0;
 		// 심박 돌아올 때까지
-		while ( !pulse_detected )
+		while ( /*!pulse_detected*/ i != 10 )
 		{
 			// 액추에이터 코드 작성
-	
+			digitalWrite( Actuator_FOR, HIGH );
+			digitalWrite( Actuator_BACK, LOW );
+			analogWrite( Actuator_PWM, 255 );
+			delay( 300 );
+			digitalWrite( Actuator_FOR, LOW );
+			digitalWrite( Actuator_BACK, HIGH );
+			analogWrite( Actuator_PWM, 255 );
+			delay( 300 );
+			i++;
 		}
+			i = 0;
 	
 		   _RESET();
-	
-		   break;
+		   
 		}
-		*/
+		
 		delay( 5 );
 	
 		if ( ( Z_LIMIT_FOR && X_LIMIT_FOR ) || ( FSR_detected && X_LIMIT_FOR ) )
