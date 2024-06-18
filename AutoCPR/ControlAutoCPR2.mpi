@@ -46,10 +46,6 @@ ver3.5   심박센서 값 추가(연결하고 주석 제거하면 됨)
 #define Z_DIR 8
 #define X_PUL 5
 #define X_DIR 6
-#define Actuator_PWM 3
-//#define ESCAPEbtn 2
-#define Actuator_FOR 62
-#define Actuator_BACK 63
 
 #define STOPbtn 27
 #define SLEEPbtn 28
@@ -288,6 +284,8 @@ void loop()
 	{
 		_STOP();
 	}
+
+	_ACTUATOR();
 
 	while ( start )
 	{

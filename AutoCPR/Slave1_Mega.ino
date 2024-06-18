@@ -1,52 +1,64 @@
 #include <Wire.h>
 
-const int buttonPin = 2; // 버튼 핀 번호 설정
-const int sensor1Pin = 3; // 센서 1 핀 번호 설정
-const int sensor2Pin = 4; // 센서 2 핀 번호 설정
-const int sensor3Pin = 5; // 센서 3 핀 번호 설정
-const int sensor4Pin = 6; // 센서 4 핀 번호 설정
+#define btn 2
+#define Actuator_FOR 6
+#define Actuator_BACK 7
+#define Actuator_PWM 5
 
-volatile bool buttonPressed = false; // 인터럽트에 의해 변경될 변수
+volatile bool stopp = false;
+volatile bool do_actuator = false;
+volatile bool dooo = false;
 
 void setup() {
-  Wire.begin(8); // 슬레이브 주소 8로 I2C 버스 시작
-  pinMode(buttonPin, INPUT_PULLUP); // 버튼 핀을 입력으로 설정, 내부 풀업 저항 사용
-  pinMode(sensor1Pin, INPUT); // 센서 1 핀을 입력으로 설정
-  pinMode(sensor2Pin, INPUT); // 센서 2 핀을 입력으로 설정
-  pinMode(sensor3Pin, INPUT); // 센서 3 핀을 입력으로 설정
-  pinMode(sensor4Pin, INPUT); // 센서 4 핀을 입력으로 설정
-  attachInterrupt(digitalPinToInterrupt(buttonPin), buttonInterrupt, FALLING); // 버튼 핀에 인터럽트 연결
-  Wire.onRequest(requestEvent); // 데이터 요청 시 실행할 함수 등록
+  Wire.begin(10); // 슬레이브 주소 0x04로 I2C 통신 시작
+  pinMode( btn, INPUT_PULLUP );
+  pinMode( Actuator_PWM, OUTPUT       );
+  pinMode( Actuator_FOR, OUTPUT       );
+  pinMode( Actuator_BACK, OUTPUT       );
+  attachInterrupt(digitalPinToInterrupt(btn), R_btn, FALLING);
+  Wire.onRequest(requestEvent);
+  Wire.onReceive(receiveEvent); // 데이터 수신 이벤트 핸들러 등록
+  Serial.begin(115200);
 }
 
 void loop() {
-  // 메인 루프는 비워둠, 모든 로직은 인터럽트와 onRequest에서 처리
-}
-
-void buttonInterrupt() {
-  buttonPressed = true; // 버튼이 눌림
-}
-
-void requestEvent() {
-  if (buttonPressed) {
-    Wire.write(1); // 버튼이 눌렸다는 신호 전송
-    buttonPressed = false; // 상태 초기화
-  } else {
-    int sensor1Value = digitalRead(sensor1Pin);
-    int sensor2Value = digitalRead(sensor2Pin);
-    int sensor3Value = digitalRead(sensor3Pin);
-    int sensor4Value = digitalRead(sensor4Pin);
-
-    if (sensor1Value == LOW) {
-      Wire.write(2); // 센서 1 인식 신호 전송
-    } else if (sensor2Value == LOW) {
-      Wire.write(3); // 센서 2 인식 신호 전송
-    } else if (sensor3Value == LOW) {
-      Wire.write(4); // 센서 3 인식 신호 전송
-    } else if (sensor4Value == LOW) {
-      Wire.write(5); // 센서 4 인식 신호 전송
-    } else {
-      Wire.write(0); // 변화 없음을 나타내는 신호 전송
+  while(do_actuator){
+        if(!do_actuator) break;
+        digitalWrite( Actuator_FOR, HIGH );
+        digitalWrite( Actuator_BACK, LOW );
+        analogWrite( Actuator_PWM, 255 );
+        delay( 300 );
+        if(!do_actuator) break;
+        digitalWrite( Actuator_FOR, LOW );
+        digitalWrite( Actuator_BACK, HIGH );
+        analogWrite( Actuator_PWM, 255 );
+        delay( 300 );
     }
+}
+void R_btn(){
+  dooo = true;
+  delay(100);
+}
+volatile int count = 0;
+void requestEvent(){
+  if (!digitalRead(btn)) Wire.write(0);
+  else if (dooo){
+    Wire.write(1);
+    dooo = false;
+  }
+  
+}
+
+void receiveEvent(int howMany) {
+  while (Wire.available()) { // 수신된 데이터 개수만큼 반복
+    int data = Wire.read(); // 데이터 읽기
+    switch(data){
+      case 1 : do_actuator = true;
+              break;
+      case 2 : do_actuator = false;
+              break;
+      default : break;
+    }
+    
   }
 }
