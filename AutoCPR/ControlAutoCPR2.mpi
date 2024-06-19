@@ -3,9 +3,10 @@
      2024년 6월 16일 17:41 수정본
      작성자 : 김지환
 
-ver3.6	계속 시작되는 거 수정해봄
+ver4.0	전체적인 동작 완
+		색인지 값만 받아오면 끝
        
-         동작테스트 미실시  
+         동작테스트 완  
          
          
 ---------------------할일------------------------
@@ -34,7 +35,6 @@ ver3.6	계속 시작되는 거 수정해봄
 
 문제 사항
 - 속도가 느림
-- 액추에이터 동작 후 계속 start해버림
 
 */
 #include <Wire.h>
@@ -60,6 +60,7 @@ ver3.6	계속 시작되는 거 수정해봄
 #define speed 1
 #define slave 10
 
+volatile bool detect_act = false;
 unsigned long long i;
 volatile bool stop = false;
 volatile bool start = false;
@@ -81,33 +82,51 @@ volatile bool y_stop = false;
 
 void setup()
 {
-   Wire.begin();
-   Serial.begin( baudrate             );
-   pinMode( Z_PUL, OUTPUT             );
-   pinMode( Z_DIR, OUTPUT             );
-   pinMode( X_PUL, OUTPUT             );
-   pinMode( X_DIR, OUTPUT             );
-   pinMode( LED_BUILTIN, OUTPUT       );
-   pinMode( STOPbtn, INPUT_PULLUP       );
-   pinMode( SLEEPbtn, INPUT_PULLUP    );
-   pinMode( Z_LIMIT_B, INPUT_PULLUP    );
-   pinMode( Z_LIMIT_F, INPUT_PULLUP    );
-   pinMode( X_LIMIT_B, INPUT_PULLUP    );
-   pinMode( X_LIMIT_F, INPUT_PULLUP    );
+	Wire.begin();
+	Serial.begin( baudrate             );
+	pinMode( Z_PUL, OUTPUT             );
+	pinMode( Z_DIR, OUTPUT             );
+	pinMode( X_PUL, OUTPUT             );
+	pinMode( X_DIR, OUTPUT             );
+	pinMode( LED_BUILTIN, OUTPUT       );
+	pinMode( STOPbtn, INPUT_PULLUP       );
+	pinMode( SLEEPbtn, INPUT_PULLUP    );
+	pinMode( Z_LIMIT_B, INPUT_PULLUP    );
+	pinMode( Z_LIMIT_F, INPUT_PULLUP    );
+	pinMode( X_LIMIT_B, INPUT_PULLUP    );
+	pinMode( X_LIMIT_F, INPUT_PULLUP    );
 	pinMode( STOPactu, INPUT_PULLUP	);
 
-   cli();  // 인터럽트 비활성화
-   TCCR5A = 0;
-   TCCR5B = 0;
-   TCNT5 = 0;
-   OCR5A = 8000;  // 수가 줄수록 빨리 인터럽트
-   TCCR5B |= ( 1 << WGM52 ); // CTC 모드
-   TCCR5B |= ( 1 << CS52 ) | ( 1 << CS50 ); // 1024 분주 설정
-   TIMSK5 |= ( 1 << OCIE5A ); // 타이머 비교 인터럽트 허용
-   sei();  // 인터럽트 활성화
-   
-   // 비상 정지 버튼
-   attachInterrupt( digitalPinToInterrupt( STOPactu ), _STOPACTU, FALLING );
+	// 변수 초기화
+	start = false;
+	stop = false;
+	sleep = false;
+	actflag = false;
+	FSR_detected = false;
+	pulse_detected = false;
+	pulse_val = 0;
+	FSR_val = 0;
+	do_Actuator = false;
+	stopp = false;
+	Z_LIMIT_BACK = false;
+	X_LIMIT_BACK = false;
+	Z_LIMIT_FOR = false;
+	X_LIMIT_FOR = false;
+	x_stop = false;
+	y_stop = false;
+
+	cli();  // 인터럽트 비활성화
+	TCCR5A = 0;
+	TCCR5B = 0;
+	TCNT5 = 0;
+	OCR5A = 8000;  // 수가 줄수록 빨리 인터럽트
+	TCCR5B |= ( 1 << WGM52 ); // CTC 모드
+	TCCR5B |= ( 1 << CS52 ) | ( 1 << CS50 ); // 1024 분주 설정
+	TIMSK5 |= ( 1 << OCIE5A ); // 타이머 비교 인터럽트 허용
+	sei();  // 인터럽트 활성화
+
+	// 비상 정지 버튼
+	attachInterrupt( digitalPinToInterrupt( STOPactu ), _STOPACTU, FALLING );
 
 
 }
@@ -259,6 +278,8 @@ void _SSEBTN()
 
 void loop()
 {
+	_SSEBTN();
+	
 	Wire.requestFrom( slave, 3 );
 	if ( Wire.available() )
 	{
@@ -267,6 +288,7 @@ void loop()
 		{
 			case 0:
 				start = false;
+				break;
 			case 1:
 				_START();
 				break;
@@ -275,20 +297,19 @@ void loop()
 		}
 	}
 
-
 	/*// 심정지 시
 	if ( !pulse_detected )
 	{
 	   _START();
 	}
 	*/
-
-	// stop 플래그 확인
-	if ( digitalRead( STOPbtn ) )
+	
+	if ( detect_act )
 	{
-		_STOP();
+		start = false;
+		detect_act = false;
 	}
-
+	
 	while ( start && !stop )
 	{
 		// X축 작동
@@ -353,11 +374,10 @@ void loop()
 				Wire.beginTransmission( slave );
 				Wire.write( 2 );
 				Wire.endTransmission();
-	
-				delay( 100 );
 			}
 		}
 		_RESET();
+		detect_act = true;
 		actflag = false;
 		do_Actuator = false;
 		start = false;
