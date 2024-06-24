@@ -47,7 +47,7 @@ void RailMotor::moveXBackward()
 
 void RailMotor::moveZForward()
 {
-    digitalWrite(_z_dir, HIGH);
+    digitalWrite(_z_dir, LOW);
     digitalWrite(_z_pul, HIGH);
     delayMicroseconds(_speed);
     digitalWrite(_z_pul, LOW);
@@ -56,7 +56,7 @@ void RailMotor::moveZForward()
 
 void RailMotor::moveZBackward()
 {
-    digitalWrite(_z_dir, LOW);
+    digitalWrite(_z_dir, HIGH);
     digitalWrite(_z_pul, HIGH);
     delayMicroseconds(_speed);
     digitalWrite(_z_pul, LOW);
@@ -92,12 +92,26 @@ void RailMotor::setSpeed(int speed)
     _speed = speed;
 }
 
-bool RailMotor::isXLimitReached()
+bool RailMotor::if_F_XLimit_Reached()
 {
-    return (_x_limit_f != -1) ? digitalRead(_x_limit_f) : false;
+    if(_x_limit_f != -1) return digitalRead(_x_limit_f);
+    else                 return false;
 }
 
-bool RailMotor::isZLimitReached()
+bool RailMotor::if_B_XLimit_Reached()
 {
-    return (_z_limit_f != -1) ? digitalRead(_z_limit_f) : false;
+    if(_x_limit_b != -1) return digitalRead(_x_limit_b);
+    else                 return false;
+}
+
+bool RailMotor::if_F_ZLimit_Reached()
+{
+    if(_y_limit_f != -1) return digitalRead(_y_limit_f);
+    else                 return false;
+}
+
+bool RailMotor::if_B_ZLimit_Reached()
+{
+    if(_y_limit_b != -1) return digitalRead(_y_limit_b);
+    else                 return false;
 }
