@@ -1,10 +1,12 @@
 #include "ButtonControl.h"
 
-ButtonControl::ButtonControl(int sleepPin, int stopPin, int startPin)
-    : _sleepPin(sleepPin), _stopPin(stopPin), _startPin(startPin), 
-      _startFlag(false), _stopFlag(false), _sleepFlag(false) {}
+ButtonControl::ButtonControl(int sleepPin, int stopPin, int startPin){
+    _sleepPin = sleepPin;
+    _stopPin = stopPin;
+    _startPin = startPin;
+}
 
-void ButtonControl::initialize() {
+void ButtonControl::Button_initialize() {
     pinMode(_sleepPin, INPUT_PULLUP);
     pinMode(_stopPin, INPUT_PULLUP);
     if (_startPin != -1) {
@@ -13,10 +15,10 @@ void ButtonControl::initialize() {
 }
 
 void ButtonControl::checkButtons() {
-    handleSleepButton();
-    handleStopButton();
+    if (digitalRead(_sleepPin)) Detect_SleepButton();
+    if (digitalRead(_stopPin)) Detect_StopButton();
     if (_startPin != -1) {
-        handleStartButton();
+        if (digitalRead(_startPin)) Detect_StartButton();
     }
 }
 
@@ -48,11 +50,3 @@ bool ButtonControl::isStop() {
 bool ButtonControl::isSleep() {
     return _sleepFlag;
 }
-
-void ButtonControl::handleSleepButton() {
-    if (digitalRead(_sleepPin) == LOW) {
-        sleepAction();
-    }
-}
-
-void

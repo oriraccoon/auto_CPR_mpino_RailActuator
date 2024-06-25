@@ -65,15 +65,21 @@ void RailMotor::moveZBackward()
 
 void RailMotor::resetPosition()
 {
-    while (!isXLimitReached() || !isZLimitReached())
+    while (!digitalRead(_x_limit_b) || !digitalRead(_z_limit_b))
     {
-        if (_x_limit_b != -1 && !digitalRead(_x_limit_b))
+        if(!digitalRead(_x_limit_b) || !digitalRead(_z_limit_b) && !_reset_x && !_reset_z){
+            moveXBackward();
+            moveZBackward();
+        }
+        if (!digitalRead(_x_limit_b) || digitalRead(_z_limit_b) && !_reset_x)
         {
             moveXBackward();
+            _reset_z = true;
         }
-        if (_z_limit_b != -1 && !digitalRead(_z_limit_b))
+        if (digitalRead(_x_limit_b) || !digitalRead(_z_limit_b) && !_reset_z)
         {
             moveZBackward();
+            _reset_x = true;
         }
 
         if (_x_limit_b == -1 && _z_limit_b == -1)
@@ -85,33 +91,11 @@ void RailMotor::resetPosition()
 
         // handle other conditions like sleep or stop buttons if needed
     }
+    _reset_x = false;
+    _reset_z = false;
 }
 
 void RailMotor::setSpeed(int speed)
 {
     _speed = speed;
-}
-
-bool RailMotor::if_F_XLimit_Reached()
-{
-    if(_x_limit_f != -1) return digitalRead(_x_limit_f);
-    else                 return false;
-}
-
-bool RailMotor::if_B_XLimit_Reached()
-{
-    if(_x_limit_b != -1) return digitalRead(_x_limit_b);
-    else                 return false;
-}
-
-bool RailMotor::if_F_ZLimit_Reached()
-{
-    if(_y_limit_f != -1) return digitalRead(_y_limit_f);
-    else                 return false;
-}
-
-bool RailMotor::if_B_ZLimit_Reached()
-{
-    if(_y_limit_b != -1) return digitalRead(_y_limit_b);
-    else                 return false;
 }

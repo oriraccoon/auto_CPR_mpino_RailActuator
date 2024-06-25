@@ -5,9 +5,9 @@
 
 class ButtonControl {
 public:
-    ButtonControl(int sleepPin, int stopPin, int startPin = -1);
+    ButtonControl(int sleepPin = -1, int stopPin = -1, int startPin = -1);
 
-    void initialize();
+    void Button_initialize();
     void checkButtons();
     void startAction();
     void stopAction();
@@ -22,13 +22,9 @@ private:
     int _stopPin;
     int _startPin;
 
-    volatile bool _startFlag;
-    volatile bool _stopFlag;
-    volatile bool _sleepFlag;
-
-    void handleSleepButton();
-    void handleStopButton();
-    void handleStartButton();
+    volatile bool _startFlag = false;
+    volatile bool _stopFlag; = false;
+    volatile bool _sleepFlag = false;
 };
 
 #endif // BUTTON_CONTROL_H

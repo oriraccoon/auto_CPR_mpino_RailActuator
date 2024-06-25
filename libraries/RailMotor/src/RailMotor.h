@@ -16,13 +16,12 @@ class RailMotor {
     void resetPosition();
     void setSpeed(int speed);
 
-    bool isXLimitReached();
-    bool isZLimitReached();
-
   private:
     int _x_pul, _x_dir, _z_pul, _z_dir;
     int _x_limit_b, _x_limit_f, _z_limit_b, _z_limit_f;
     int _speed; // 마이크로초 단위 딜레이
+    bool _reset_x = false;
+    bool _reset_z = false;
 };
 
 #endif
