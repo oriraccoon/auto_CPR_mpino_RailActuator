@@ -13,7 +13,7 @@ ver4.0	전체적인 동작 완
       모터 구동                        O
       버튼 동작                        O
       압력 센서 받기                  O
-      심박 센서 받기                  X
+      심박 센서 받기                  O
       색인지 센서 받기                  X
       색인지 위치까지 X_모터 구동         X
       압력 센서 인식 시 Z_모터 정지         O
@@ -31,8 +31,7 @@ ver4.0	전체적인 동작 완
 
 
 수정 할 사항
-- 만약 모터 구동시 Microdelay를 삭제한다면 어떻게 동작? 테스트해보기
-
+- x
 문제 사항
 - 속도가 느림
 
@@ -54,7 +53,6 @@ ver4.0	전체적인 동작 완
 #define X_LIMIT_F 25
 
 #define FSR_sensor A0
-//#define PULSE_sensor A1
 
 #define baudrate 115200
 #define speed 1
@@ -67,8 +65,6 @@ volatile bool start = false;
 volatile bool sleep = false;
 volatile bool actflag = false;
 volatile bool FSR_detected = false;
-volatile bool pulse_detected = false;
-volatile int pulse_val = 0;
 volatile int FSR_val = 0;
 volatile bool do_Actuator = false;
 volatile bool stopp = false;
@@ -103,8 +99,6 @@ void setup()
 	sleep = false;
 	actflag = false;
 	FSR_detected = false;
-	pulse_detected = false;
-	pulse_val = 0;
 	FSR_val = 0;
 	do_Actuator = false;
 	stopp = false;
@@ -292,17 +286,15 @@ void loop()
 			case 1:
 				_START();
 				break;
+			case 2:
+				_START();
+				break;
 			default :
 				break;
 		}
 	}
 
-	/*// 심정지 시
-	if ( !pulse_detected )
-	{
-	   _START();
-	}
-	*/
+
 	
 	if ( detect_act )
 	{
