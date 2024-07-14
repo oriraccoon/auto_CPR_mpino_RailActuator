@@ -1,101 +1,32 @@
 #include "RailMotor.h"
 
-RailMotor::RailMotor(int x_pul, int x_dir, int z_pul, int z_dir,
-                     int x_limit_b, int x_limit_f, int z_limit_b, int z_limit_f)
+RailMotor::RailMotor(int pul, int dir, int speed)
 {
-    _x_pul = x_pul;
-    _x_dir = x_dir;
-    _z_pul = z_pul;
-    _z_dir = z_dir;
-    _x_limit_b = x_limit_b;
-    _x_limit_f = x_limit_f;
-    _z_limit_b = z_limit_b;
-    _z_limit_f = z_limit_f;
-    _speed = 1000; // 디폴트 속도 설정 (예: 1000 마이크로초)
+    _pul = pul;
+    _dir = dir;
+    _speed = speed;
 }
 
 void RailMotor::setup()
 {
-    pinMode(_x_pul, OUTPUT);
-    pinMode(_x_dir, OUTPUT);
-    pinMode(_z_pul, OUTPUT);
-    pinMode(_z_dir, OUTPUT);
-
-    if (_x_limit_b != -1) pinMode(_x_limit_b, INPUT_PULLUP);
-    if (_x_limit_f != -1) pinMode(_x_limit_f, INPUT_PULLUP);
-    if (_z_limit_b != -1) pinMode(_z_limit_b, INPUT_PULLUP);
-    if (_z_limit_f != -1) pinMode(_z_limit_f, INPUT_PULLUP);
+    pinMode(_pul, OUTPUT);
+    pinMode(_dir, OUTPUT);
 }
 
-void RailMotor::moveXForward()
+void RailMotor::moveForward()
 {
-    digitalWrite(_x_dir, HIGH);
-    digitalWrite(_x_pul, HIGH);
+    digitalWrite(_dir, HIGH);
+    digitalWrite(_pul, HIGH);
     delayMicroseconds(_speed);
-    digitalWrite(_x_pul, LOW);
+    digitalWrite(_pul, LOW);
     delayMicroseconds(_speed);
 }
 
-void RailMotor::moveXBackward()
+void RailMotor::moveBackward()
 {
-    digitalWrite(_x_dir, LOW);
-    digitalWrite(_x_pul, HIGH);
+    digitalWrite(_dir, LOW);
+    digitalWrite(_pul, HIGH);
     delayMicroseconds(_speed);
-    digitalWrite(_x_pul, LOW);
+    digitalWrite(_pul, LOW);
     delayMicroseconds(_speed);
-}
-
-void RailMotor::moveZForward()
-{
-    digitalWrite(_z_dir, LOW);
-    digitalWrite(_z_pul, HIGH);
-    delayMicroseconds(_speed);
-    digitalWrite(_z_pul, LOW);
-    delayMicroseconds(_speed);
-}
-
-void RailMotor::moveZBackward()
-{
-    digitalWrite(_z_dir, HIGH);
-    digitalWrite(_z_pul, HIGH);
-    delayMicroseconds(_speed);
-    digitalWrite(_z_pul, LOW);
-    delayMicroseconds(_speed);
-}
-
-void RailMotor::resetPosition()
-{
-    while (!digitalRead(_x_limit_b) || !digitalRead(_z_limit_b))
-    {
-        if(!digitalRead(_x_limit_b) || !digitalRead(_z_limit_b) && !_reset_x && !_reset_z){
-            moveXBackward();
-            moveZBackward();
-        }
-        if (!digitalRead(_x_limit_b) || digitalRead(_z_limit_b) && !_reset_x)
-        {
-            moveXBackward();
-            _reset_z = true;
-        }
-        if (digitalRead(_x_limit_b) || !digitalRead(_z_limit_b) && !_reset_z)
-        {
-            moveZBackward();
-            _reset_x = true;
-        }
-
-        if (_x_limit_b == -1 && _z_limit_b == -1)
-        {
-            // handle without limit switches
-        }
-
-        delayMicroseconds(_speed);
-
-        // handle other conditions like sleep or stop buttons if needed
-    }
-    _reset_x = false;
-    _reset_z = false;
-}
-
-void RailMotor::setSpeed(int speed)
-{
-    _speed = speed;
 }

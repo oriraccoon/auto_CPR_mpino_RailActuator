@@ -1,21 +1,22 @@
 /*
 
-     2024년 6월 16일 17:41 수정본
+     2024년 7월 10일 13:41 수정본
      작성자 : 김지환
 
-ver4.0	전체적인 동작 완
-		색인지 값만 받아오면 끝
+ver5.0	전체적인 동작 완
+		헤더파일, 코드 간결화
+		정상 심박시 액추에이터 정지 추가
+		
+		동작 테스트 미실시
        
-         동작테스트 완  
-         
          
 ---------------------할일------------------------
       모터 구동                        O
       버튼 동작                        O
       압력 센서 받기                  O
       심박 센서 받기                  O
-      색인지 센서 받기                  X
-      색인지 위치까지 X_모터 구동         X
+      색인지 센서 받기                  O
+      색인지 위치까지 X_모터 구동         O
       압력 센서 인식 시 Z_모터 정지         O
       정지 버튼 초기 위치로               O
       액추에이터 연결                  O
@@ -36,34 +37,42 @@ ver4.0	전체적인 동작 완
 - 속도가 느림
 
 */
-#include <Wire.h>
 
-#define Z_PUL 7
-#define Z_DIR 8
+#include <Wire.h>
+#include <RailMotor.h>
+
+void _STOP();
+void _SLEEP();
+void _START();
+void _RESET();
+void _WHILE_SLEEP();
+void _SSEBTN();
+void _READCCC();
+void _I2C_READ();
+
 #define X_PUL 5
 #define X_DIR 6
-
-#define STOPbtn 26
-#define SLEEPbtn 27
-#define STOPactu 2
+#define Z_PUL 7
+#define Z_DIR 8
 
 #define Z_LIMIT_B 22
 #define Z_LIMIT_F 23
 #define X_LIMIT_B 24
 #define X_LIMIT_F 25
+#define STOPbtn 26
+#define SLEEPbtn 27
 
 #define FSR_sensor A0
+#define analCCC A1
 
-#define baudrate 115200
-#define speed 1
-#define slave 10
+int baudrate 115200;
+int speed 1;
+int slave 10;
 
 volatile bool detect_act = false;
-unsigned long long i;
 volatile bool stop = false;
 volatile bool start = false;
 volatile bool sleep = false;
-volatile bool actflag = false;
 volatile bool FSR_detected = false;
 volatile int FSR_val = 0;
 volatile bool do_Actuator = false;
@@ -73,41 +82,22 @@ volatile bool Z_LIMIT_BACK = false;
 volatile bool X_LIMIT_BACK = false;
 volatile bool Z_LIMIT_FOR = false;
 volatile bool X_LIMIT_FOR = false;
-volatile bool x_stop = false;
-volatile bool y_stop = false;
+volatile bool ccc_detect = false;
+volatile bool normal_BPM = true;
+
+x_motor RailMotor(X_PUL, X_DIR, speed);
+Z_motor RailMotor(Z_PUL, Z_DIR, speed);
 
 void setup()
 {
 	Wire.begin();
 	Serial.begin( baudrate             );
-	pinMode( Z_PUL, OUTPUT             );
-	pinMode( Z_DIR, OUTPUT             );
-	pinMode( X_PUL, OUTPUT             );
-	pinMode( X_DIR, OUTPUT             );
-	pinMode( LED_BUILTIN, OUTPUT       );
 	pinMode( STOPbtn, INPUT_PULLUP       );
 	pinMode( SLEEPbtn, INPUT_PULLUP    );
 	pinMode( Z_LIMIT_B, INPUT_PULLUP    );
 	pinMode( Z_LIMIT_F, INPUT_PULLUP    );
 	pinMode( X_LIMIT_B, INPUT_PULLUP    );
 	pinMode( X_LIMIT_F, INPUT_PULLUP    );
-	pinMode( STOPactu, INPUT_PULLUP	);
-
-	// 변수 초기화
-	start = false;
-	stop = false;
-	sleep = false;
-	actflag = false;
-	FSR_detected = false;
-	FSR_val = 0;
-	do_Actuator = false;
-	stopp = false;
-	Z_LIMIT_BACK = false;
-	X_LIMIT_BACK = false;
-	Z_LIMIT_FOR = false;
-	X_LIMIT_FOR = false;
-	x_stop = false;
-	y_stop = false;
 
 	cli();  // 인터럽트 비활성화
 	TCCR5A = 0;
@@ -117,42 +107,94 @@ void setup()
 	TCCR5B |= ( 1 << WGM52 ); // CTC 모드
 	TCCR5B |= ( 1 << CS52 ) | ( 1 << CS50 ); // 1024 분주 설정
 	TIMSK5 |= ( 1 << OCIE5A ); // 타이머 비교 인터럽트 허용
-	sei();  // 인터럽트 활성화
-
-	// 비상 정지 버튼
-	attachInterrupt( digitalPinToInterrupt( STOPactu ), _STOPACTU, FALLING );
-
-
-}
-
-void delayNanoseconds( unsigned int ns )
-{
-   // 대략적인 딜레이를 위해 어셈블리어 nop 명령어 사용
-   unsigned int cycles = ( F_CPU / 1000000000L ) * ns / 3;
-   for ( unsigned int i = 0; i < cycles; i++ )
-   {
-      asm volatile ( "nop" );
-   }
+	sei(); // 인터럽트 활성화
 }
 
 ISR( TIMER5_COMPA_vect )
 {
 	FSR_val = analogRead( FSR_sensor );
-	// pulse_val = analogRead( PULSE_sensor) ;
 	if ( FSR_val > 100 ) FSR_detected = true;
 	else FSR_detected = false;
-	/* if ( pulse_val > 70 ) pulse_detected = true;
-	else pulse_detected = false;
-	*/
+
+	_READCCC();
 }
 
-// 비상 정지 버튼 동작코드
-void _STOPACTU()
+void loop()
 {
-	actflag = true;
+	_SSEBTN();
+	
+	_I2C_READ();
+	
+	if ( detect_act )
+	{
+		start = false;
+		detect_act = false;
+	}
+	
+	while ( (start && !stop) || !normal_BPM )
+	{
+		// X축 작동
+		while ( !( X_LIMIT_FOR || stop || ccc_detect ) )
+		{
+			if ( digitalRead( X_LIMIT_F ) )   X_LIMIT_FOR = true;
+	
+			x_motor.moveBackward();
+		
+			_SSEBTN();
+		}
+	
+		delay( 5 );
+	
+		// Z축 작동
+		while ( !( Z_LIMIT_FOR || FSR_detected || stop ) )
+		{
+			if ( digitalRead( Z_LIMIT_F ) )   Z_LIMIT_FOR = true;
+	
+			z_motor.moveBackward();
+	
+			_SSEBTN();
+		}
+	
+		delay( 100 );
+	
+		if ( ( FSR_detected && ccc_detect ) )
+		{
+			start = false;
+			do_Actuator = true;
+			while ( 1 )
+			{
+				if ( do_Actuator )
+				{
+					Wire.beginTransmission( slave );
+					Wire.write( 1 );
+					Wire.endTransmission();
+	
+					do_Actuator = false;
+				}
+				
+				_I2C_READ();
+
+				if ( digitalRead( STOPbtn ) ) break;
+				else if (normal_BPM) break;
+			}
+
+			Wire.beginTransmission( slave );
+			Wire.write( 2 );
+			Wire.endTransmission();
+		}
+
+		_RESET();
+		detect_act = true;
+		do_Actuator = false;
+		start = false;
+		stop = false;
+		sleep = false;
+		Z_LIMIT_FOR = false;
+		X_LIMIT_FOR = false;
+		ccc_detect = false;
+	}
+
 }
-
-
 
 // 정지버튼 동작코드
 void _STOP()
@@ -174,60 +216,28 @@ void _SLEEP()
 void _START()
 {
    start = true;
-	stop = false;
-}
-
-void _Z_FORWARD()
-{
-   digitalWrite( Z_DIR, LOW );
-}
-
-void _Z_BACKWARD()
-{
-   digitalWrite( Z_DIR, HIGH );
-}
-
-void _X_FORWARD()
-{
-   digitalWrite( X_DIR, HIGH );
-}
-
-void _X_BACKWARD()
-{
-   digitalWrite( X_DIR, LOW );
+   stop = false;
 }
 
 void _RESET()
 {
 	while ( !Z_LIMIT_BACK || !X_LIMIT_BACK )
 	{
-		_Z_BACKWARD();
-		_X_BACKWARD();
 		if ( digitalRead( Z_LIMIT_B ) ) Z_LIMIT_BACK = true;
 		if ( digitalRead( X_LIMIT_B ) ) X_LIMIT_BACK = true;
 		if ( !Z_LIMIT_BACK && !X_LIMIT_BACK )
 		{
-			digitalWrite( Z_PUL, HIGH );
-			digitalWrite( X_PUL, HIGH );
-			delayMicroseconds( speed );
-			digitalWrite( X_PUL, LOW );
-			digitalWrite( Z_PUL, LOW );
-			delayMicroseconds( speed );
+			x_motor.moveBackward();
+			Z_motor.moveBackward();
 		}
 		else if ( !Z_LIMIT_BACK && X_LIMIT_BACK  )
 		{
-			digitalWrite( Z_PUL, HIGH );
-			delayMicroseconds( speed );
-			digitalWrite( Z_PUL, LOW );
-			delayMicroseconds( speed );
+			Z_motor.moveBackward();
 		}
 
 		else if ( !X_LIMIT_BACK && Z_LIMIT_BACK )
 		{
-			digitalWrite( X_PUL, HIGH );
-			delayMicroseconds( speed );
-			digitalWrite( X_PUL, LOW );
-			delayMicroseconds( speed );
+			x_motor.moveBackward();
 		}
 
 		if ( digitalRead( SLEEPbtn ) ) _SLEEP();
@@ -266,14 +276,20 @@ void _SSEBTN()
    if ( digitalRead( SLEEPbtn ) )   _SLEEP();
 
    // stop 플래그 확인
-   if ( digitalRead( STOPbtn ) || stop )   _STOP();
+   if ( digitalRead( STOPbtn ) )   _STOP();
 }
 
-
-void loop()
+void _READCCC()
 {
-	_SSEBTN();
+	Serial.println( analogRead( analCCC ) );
+	Serial.println( ccc_detect );
+	if ( analogRead( analCCC ) > 100 ) ccc_detect = true;
 	
+	delay( 500 );
+}
+
+void _I2C_READ()
+{
 	Wire.requestFrom( slave, 3 );
 	if ( Wire.available() )
 	{
@@ -287,96 +303,13 @@ void loop()
 				_START();
 				break;
 			case 2:
-				_START();
+				normal_BPM = false;
+				break;
+			case 9:
+				normal_BPM = true;
 				break;
 			default :
 				break;
 		}
 	}
-
-
-	
-	if ( detect_act )
-	{
-		start = false;
-		detect_act = false;
-	}
-	
-	while ( start && !stop )
-	{
-		// X축 작동
-		_X_FORWARD();
-		while ( !( X_LIMIT_FOR || stop )/*!(X_LIMIT_FOR || x_stop || stop)*/ )
-		{
-			if ( digitalRead( X_LIMIT_F ) )   X_LIMIT_FOR = true;
-	
-			digitalWrite( X_PUL, HIGH );
-			delayMicroseconds( speed );
-			digitalWrite( X_PUL, LOW );
-			delayMicroseconds( speed );
-	
-			/*
-			// 색인지카메라 값 들어오면
-			if ( colorRead )
-			{
-			   x_stop = true;
-			}
-			*/
-	
-			_SSEBTN();
-		}
-	
-		delay( 5 );
-	
-		// Z축 작동
-		_Z_FORWARD();
-		while ( !( Z_LIMIT_FOR || FSR_detected || stop ) )
-		{
-			if ( digitalRead( Z_LIMIT_F ) )   Z_LIMIT_FOR = true;
-	
-			digitalWrite( Z_PUL, HIGH );
-			delayMicroseconds( speed ); // 속도
-			digitalWrite( Z_PUL, LOW );
-			delayMicroseconds( speed );
-	
-			_SSEBTN();
-	
-		}
-	
-		delay( 100 );
-	
-		if ( ( FSR_detected && X_LIMIT_FOR )  /* (colorRead && FSR_detected) */ )
-		{
-			start = false;
-			do_Actuator = true;
-			while ( !actflag )
-			{
-				if ( do_Actuator )
-				{
-					Wire.beginTransmission( slave );
-					Wire.write( 1 );
-					Wire.endTransmission();
-	
-					do_Actuator = false;
-				}
-	
-			}
-			if ( actflag )
-			{
-				Wire.beginTransmission( slave );
-				Wire.write( 2 );
-				Wire.endTransmission();
-			}
-		}
-		_RESET();
-		detect_act = true;
-		actflag = false;
-		do_Actuator = false;
-		start = false;
-		stop = false;
-		sleep = false;
-		Z_LIMIT_FOR = false;
-		X_LIMIT_FOR = false;
-	}
-
 }
