@@ -6,7 +6,7 @@
 class RailMotor {
   public:
     RailMotor(int pul, int dir, int speed = 10);
-    RailMotor(int pul, int dir, int speed = 10, int limit_for, int limit_back);
+    RailMotor(int pul, int dir, int limit_for, int limit_backint, int speed = 10);
     void setup();
     void moveForward();
     void moveBackward();

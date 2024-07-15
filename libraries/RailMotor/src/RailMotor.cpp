@@ -8,13 +8,13 @@ RailMotor::RailMotor(int pul, int dir, int speed)
     _speed = speed;
 }
 
-RailMotor::RailMotor(int pul, int dir, int speed, int limit_for, int limit_back)
+RailMotor::RailMotor(int pul, int dir, int limit_for, int limit_back, int speed)
 {
     _pul = pul;
     _dir = dir;
-    _speed = speed;
     _limit_for = limit_for;
     _limit_back = limit_back;
+    _speed = speed;
 }
 
 void RailMotor::setup()

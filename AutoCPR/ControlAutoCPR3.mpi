@@ -63,9 +63,9 @@ void _I2C_READ();
 #define FSR_sensor A0
 #define analCCC A1
 
-int baudrate 115200;
-int speed 1;
-int slave 10;
+int baudrate = 115200;
+int speed = 1;
+int slave = 10;
 
 volatile bool detect_act = false;
 volatile bool stop = false;
