@@ -3,7 +3,7 @@
      2024년 7월 10일 13:41 수정본
      작성자 : 김지환
 
-ver5.0	전체적인 동작 완
+ver5.2	전체적인 동작 완
 		헤더파일, 코드 간결화
 		정상 심박시 액추에이터 정지 추가
 		
@@ -85,8 +85,8 @@ volatile bool X_LIMIT_FOR = false;
 volatile bool ccc_detect = false;
 volatile bool normal_BPM = true;
 
-x_motor RailMotor(X_PUL, X_DIR, speed);
-Z_motor RailMotor(Z_PUL, Z_DIR, speed);
+X_motor RailMotor(X_PUL, X_DIR, speed, X_LIMIT_F, X_LIMIT_F);
+Z_motor RailMotor(Z_PUL, Z_DIR, speed, Z_LIMIT_F, Z_LIMIT_B);
 
 void setup()
 {
@@ -94,10 +94,8 @@ void setup()
 	Serial.begin( baudrate             );
 	pinMode( STOPbtn, INPUT_PULLUP       );
 	pinMode( SLEEPbtn, INPUT_PULLUP    );
-	pinMode( Z_LIMIT_B, INPUT_PULLUP    );
-	pinMode( Z_LIMIT_F, INPUT_PULLUP    );
-	pinMode( X_LIMIT_B, INPUT_PULLUP    );
-	pinMode( X_LIMIT_F, INPUT_PULLUP    );
+	X_motor.setup();
+	Z_motor.setup();
 
 	cli();  // 인터럽트 비활성화
 	TCCR5A = 0;
@@ -131,14 +129,12 @@ void loop()
 		detect_act = false;
 	}
 	
-	while ( (start && !stop) || !normal_BPM )
+	while ( ( start && !stop ) || !normal_BPM )
 	{
 		// X축 작동
-		while ( !( X_LIMIT_FOR || stop || ccc_detect ) )
+		while ( !( stop || ccc_detect ) )
 		{
-			if ( digitalRead( X_LIMIT_F ) )   X_LIMIT_FOR = true;
-	
-			x_motor.moveBackward();
+			X_motor.moveBackward();
 		
 			_SSEBTN();
 		}
@@ -146,11 +142,9 @@ void loop()
 		delay( 5 );
 	
 		// Z축 작동
-		while ( !( Z_LIMIT_FOR || FSR_detected || stop ) )
-		{
-			if ( digitalRead( Z_LIMIT_F ) )   Z_LIMIT_FOR = true;
-	
-			z_motor.moveBackward();
+		while ( !( FSR_detected || stop ) )
+		{	
+			Z_motor.moveBackward();
 	
 			_SSEBTN();
 		}
@@ -183,14 +177,13 @@ void loop()
 			Wire.endTransmission();
 		}
 
-		_RESET();
+		X_motor.Reset();
+		Z_motor.Reset();
 		detect_act = true;
 		do_Actuator = false;
 		start = false;
 		stop = false;
 		sleep = false;
-		Z_LIMIT_FOR = false;
-		X_LIMIT_FOR = false;
 		ccc_detect = false;
 	}
 
@@ -200,8 +193,8 @@ void loop()
 void _STOP()
 {
    stop = true;
-   _RESET();
-
+   X_motor.Reset();
+   Z_motor.Reset();
 }
 
 // 대기버튼 동작코드
@@ -216,37 +209,7 @@ void _SLEEP()
 void _START()
 {
    start = true;
-   stop = false;
-}
-
-void _RESET()
-{
-	while ( !Z_LIMIT_BACK || !X_LIMIT_BACK )
-	{
-		if ( digitalRead( Z_LIMIT_B ) ) Z_LIMIT_BACK = true;
-		if ( digitalRead( X_LIMIT_B ) ) X_LIMIT_BACK = true;
-		if ( !Z_LIMIT_BACK && !X_LIMIT_BACK )
-		{
-			x_motor.moveBackward();
-			Z_motor.moveBackward();
-		}
-		else if ( !Z_LIMIT_BACK && X_LIMIT_BACK  )
-		{
-			Z_motor.moveBackward();
-		}
-
-		else if ( !X_LIMIT_BACK && Z_LIMIT_BACK )
-		{
-			x_motor.moveBackward();
-		}
-
-		if ( digitalRead( SLEEPbtn ) ) _SLEEP();
-
-
-	}
-	start = false;
-	Z_LIMIT_BACK = false;
-	X_LIMIT_BACK = false;
+	stop = false;
 }
 
 void _WHILE_SLEEP()
