@@ -82,8 +82,8 @@ volatile bool Z_LIMIT_FOR = false;
 volatile bool X_LIMIT_FOR = false;
 volatile bool ccc_detect = false;
 
-X_motor RailMotor(X_PUL, X_DIR, speed, X_LIMIT_F, X_LIMIT_F);
-Z_motor RailMotor(Z_PUL, Z_DIR, speed, Z_LIMIT_F, Z_LIMIT_B);
+RailMotor X_motor(X_PUL, X_DIR, X_LIMIT_F, X_LIMIT_F, speed);
+RailMotor Z_motor(Z_PUL, Z_DIR, Z_LIMIT_F, Z_LIMIT_B, speed);
 
 void setup()
 {
