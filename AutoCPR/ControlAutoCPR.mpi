@@ -42,7 +42,6 @@ ver5.0	전체적인 동작 완
 
 #define STOPbtn 26
 #define SLEEPbtn 27
-#define STOPactu 2
 
 #define Z_LIMIT_B 22
 #define Z_LIMIT_F 23
@@ -50,8 +49,6 @@ ver5.0	전체적인 동작 완
 #define X_LIMIT_F 25
 
 #define FSR_sensor A0
-
-#define digCCC 28
 #define analCCC A1
 
 #define baudrate 115200
@@ -92,8 +89,7 @@ void setup()
 	pinMode( Z_LIMIT_F, INPUT_PULLUP    );
 	pinMode( X_LIMIT_B, INPUT_PULLUP    );
 	pinMode( X_LIMIT_F, INPUT_PULLUP    );
-	pinMode( STOPactu, INPUT_PULLUP	);
-
+	
 	// 변수 초기화
 	start = false;
 	stop = false;
@@ -118,19 +114,7 @@ void setup()
 	TCCR5B |= ( 1 << WGM52 ); // CTC 모드
 	TCCR5B |= ( 1 << CS52 ) | ( 1 << CS50 ); // 1024 분주 설정
 	TIMSK5 |= ( 1 << OCIE5A ); // 타이머 비교 인터럽트 허용
-	TCCR1A = 0;
-	TCCR1B = 0;
-	TCNT1 = 0;
-	OCR1A = 9000;  // 수가 줄수록 빨리 인터럽트
-	TCCR1B |= ( 1 << WGM12 ); // CTC 모드
-	TCCR1B |= ( 1 << CS12 ) | ( 1 << CS10 ); // 1024 분주 설정
-	TIMSK1 |= ( 1 << OCIE1A ); // 타이머 비교 인터럽트 허용
 	sei();  // 인터럽트 활성화
-
-	// 비상 정지 버튼
-	attachInterrupt( digitalPinToInterrupt( STOPactu ), _STOPACTU, FALLING );
-
-
 
 }
 
@@ -144,20 +128,12 @@ void delayNanoseconds( unsigned int ns )
    }
 }
 
-ISR( TIMER1_COMPA_vect )
-{
-	//_READCCC();
-}
-
 ISR( TIMER5_COMPA_vect )
 {
 	FSR_val = analogRead( FSR_sensor );
-	// pulse_val = analogRead( PULSE_sensor) ;
 	if ( FSR_val > 100 ) FSR_detected = true;
 	else FSR_detected = false;
-	/* if ( pulse_val > 70 ) pulse_detected = true;
-	else pulse_detected = false;
-	*/
+	
 	_READCCC();
 }
 
@@ -309,10 +285,11 @@ void _READCCC()
 void _READCCC()
 {
 	//if ( digitalRead( digCCC ) )
-
+	int CCC_value = 0;
 	Serial.println( analogRead( analCCC ) );
-	Serial.println( ccc_detect );
-	if ( analogRead( analCCC ) > 100 ) ccc_detect = true;
+	CCC_value = analogRead( analCCC );
+	//Serial.println( ccc_detect );
+	if ( CCC_value > 280 && CCC_value < 285 ) ccc_detect = true;
 	
 	delay( 500 );
 
@@ -322,7 +299,9 @@ void loop()
 {
 	_SSEBTN();
 	
-	//_READCCC();
+	
+	
+	
 	
 	Wire.requestFrom( slave, 3 );
 	if ( Wire.available() )
