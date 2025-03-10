@@ -82,7 +82,6 @@ void setup()
 	pinMode( Z_DIR, OUTPUT             );
 	pinMode( X_PUL, OUTPUT             );
 	pinMode( X_DIR, OUTPUT             );
-	pinMode( LED_BUILTIN, OUTPUT       );
 	pinMode( STOPbtn, INPUT_PULLUP       );
 	pinMode( SLEEPbtn, INPUT_PULLUP    );
 	pinMode( Z_LIMIT_B, INPUT_PULLUP    );
@@ -118,29 +117,14 @@ void setup()
 
 }
 
-void delayNanoseconds( unsigned int ns )
-{
-   // 대략적인 딜레이를 위해 어셈블리어 nop 명령어 사용
-   unsigned int cycles = ( F_CPU / 1000000000L ) * ns / 3;
-   for ( unsigned int i = 0; i < cycles; i++ )
-   {
-      asm volatile ( "nop" );
-   }
-}
-
 ISR( TIMER5_COMPA_vect )
 {
 	FSR_val = analogRead( FSR_sensor );
+	//Serial.println( FSR_val );
 	if ( FSR_val > 100 ) FSR_detected = true;
 	else FSR_detected = false;
 	
 	_READCCC();
-}
-
-// 비상 정지 버튼 동작코드
-void _STOPACTU()
-{
-	actflag = true;
 }
 
 
@@ -188,6 +172,21 @@ void _X_BACKWARD()
    digitalWrite( X_DIR, LOW );
 }
 
+void _X_MOVE()
+{
+	digitalWrite( X_PUL, HIGH );
+	delayMicroseconds( speed );
+	digitalWrite( X_PUL, LOW );
+	delayMicroseconds( speed );
+}
+void _Z_MOVE()
+{
+	digitalWrite( Z_PUL, HIGH );
+	delayMicroseconds( speed );
+	digitalWrite( Z_PUL, LOW );
+	delayMicroseconds( speed );
+}
+
 void _RESET()
 {
 	while ( !Z_LIMIT_BACK || !X_LIMIT_BACK )
@@ -198,27 +197,17 @@ void _RESET()
 		if ( digitalRead( X_LIMIT_B ) ) X_LIMIT_BACK = true;
 		if ( !Z_LIMIT_BACK && !X_LIMIT_BACK )
 		{
-			digitalWrite( Z_PUL, HIGH );
-			digitalWrite( X_PUL, HIGH );
-			delayMicroseconds( speed );
-			digitalWrite( X_PUL, LOW );
-			digitalWrite( Z_PUL, LOW );
-			delayMicroseconds( speed );
+			_X_MOVE();
+			_Z_MOVE();
 		}
 		else if ( !Z_LIMIT_BACK && X_LIMIT_BACK  )
 		{
-			digitalWrite( Z_PUL, HIGH );
-			delayMicroseconds( speed );
-			digitalWrite( Z_PUL, LOW );
-			delayMicroseconds( speed );
+			_Z_MOVE();
 		}
 
 		else if ( !X_LIMIT_BACK && Z_LIMIT_BACK )
 		{
-			digitalWrite( X_PUL, HIGH );
-			delayMicroseconds( speed );
-			digitalWrite( X_PUL, LOW );
-			delayMicroseconds( speed );
+			_X_MOVE();
 		}
 
 		if ( digitalRead( SLEEPbtn ) ) _SLEEP();
@@ -259,28 +248,6 @@ void _SSEBTN()
    // stop 플래그 확인
    if ( digitalRead( STOPbtn ) )   _STOP();
 }
-/*
-void _READCCC()
-{
-	// grab blocks!
-	pixy.ccc.getBlocks();
-
-	// If there are detect blocks, print them!
-	if ( pixy.ccc.numBlocks )
-	{
-		Serial.print( "Detected " );
-		Serial.println( pixy.ccc.numBlocks );
-		ccc_detect = true;
-		for ( int in = 0; in < pixy.ccc.numBlocks; in++ )
-		{
-			if ( pixy.ccc.blocks[i].m_x > 155 && pixy.ccc.blocks[i].m_x < 165 && pixy.ccc.blocks[i].m_y > 100 && pixy.ccc.blocks[i].m_y < 110 )
-			{
-				Serial.println( "Center arrive!" );
-				ccc_detect = true;
-			}
-		}
-	}
-}*/
 
 void _READCCC()
 {
@@ -289,7 +256,7 @@ void _READCCC()
 	Serial.println( analogRead( analCCC ) );
 	CCC_value = analogRead( analCCC );
 	//Serial.println( ccc_detect );
-	if ( CCC_value > 280 && CCC_value < 285 ) ccc_detect = true;
+	if ( CCC_value > 275 && CCC_value < 277 ) ccc_detect = true;
 	
 	delay( 500 );
 
@@ -298,10 +265,6 @@ void _READCCC()
 void loop()
 {
 	_SSEBTN();
-	
-	
-	
-	
 	
 	Wire.requestFrom( slave, 3 );
 	if ( Wire.available() )
@@ -323,8 +286,6 @@ void loop()
 		}
 	}
 	
-
-	
 	if ( detect_act )
 	{
 		start = false;
@@ -339,12 +300,8 @@ void loop()
 		{
 			if ( digitalRead( X_LIMIT_F ) )   X_LIMIT_FOR = true;
 	
-			digitalWrite( X_PUL, HIGH );
-			delayMicroseconds( speed );
-			digitalWrite( X_PUL, LOW );
-			delayMicroseconds( speed );
 			
-			
+					
 			_SSEBTN();
 		}
 	
@@ -356,19 +313,14 @@ void loop()
 		{
 			if ( digitalRead( Z_LIMIT_F ) )   Z_LIMIT_FOR = true;
 	
-			digitalWrite( Z_PUL, HIGH );
-			delayMicroseconds( speed ); // 속도
-			digitalWrite( Z_PUL, LOW );
-			delayMicroseconds( speed );
+			_Z_MOVE();
 	
 			_SSEBTN();
-			
-	
 		}
 	
-		delay( 100 );
+		delay( 5 );
 	
-		if ( ( FSR_detected && ccc_detect )  /* (colorRead && FSR_detected) */ )
+		if ( ( X_LIMIT_FOR && Z_LIMIT_FOR ) || ccc_detect /* (colorRead && FSR_detected) */ )
 		{
 			start = false;
 			do_Actuator = true;
@@ -381,6 +333,19 @@ void loop()
 					Wire.endTransmission();
 	
 					do_Actuator = false;
+				}
+				Wire.requestFrom( slave, 3 );
+				if ( Wire.available() )
+				{
+					int status = Wire.read(); // 첫 번째 바이트는 상태
+					switch ( status )
+					{
+						case 9:
+							actflag = true;
+							break;
+						default :
+							break;
+					}
 				}
 				
 				if ( digitalRead( STOPbtn ) ) actflag = true;
