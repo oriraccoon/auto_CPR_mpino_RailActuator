@@ -7,16 +7,24 @@ ButtonControl::ButtonControl(int sleepPin, int stopPin, int startPin){
 }
 
 void ButtonControl::Button_initialize() {
-    pinMode(_sleepPin, INPUT_PULLUP);
-    pinMode(_stopPin, INPUT_PULLUP);
+    if (_sleepPin != -1) {
+        pinMode(_sleepPin, INPUT_PULLUP);
+    }
+    if (_stopPin != -1) {
+        pinMode(_stopPin, INPUT_PULLUP);
+    }
     if (_startPin != -1) {
         pinMode(_startPin, INPUT_PULLUP);
     }
 }
 
 void ButtonControl::checkButtons() {
-    if (digitalRead(_sleepPin)) Detect_SleepButton();
-    if (digitalRead(_stopPin)) Detect_StopButton();
+    if (_sleepPin != -1) {
+        if (digitalRead(_sleepPin)) Detect_SleepButton();
+    }
+    if (_stopPin != -1) {
+        if (digitalRead(_stopPin)) Detect_StopButton();
+    }
     if (_startPin != -1) {
         if (digitalRead(_startPin)) Detect_StartButton();
     }
